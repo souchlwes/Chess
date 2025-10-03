@@ -1,63 +1,282 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Retro 3D Chess</title>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro 3D Chess</title>
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.2/chess.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0d9b5; color: #333; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        #board { width: 400px; height: 400px; margin: 20px auto; }
+        .controls { display: flex; gap: 10px; margin: 10px 0; align-items: center; flex-wrap: wrap; justify-content: center; }
+        button { padding: 8px 16px; background: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        button:hover { background: #45a049; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        select, input { padding: 8px; margin: 0 5px; }
+        #status { font-weight: bold; text-align: center; margin: 10px; }
+        #history { width: 200px; height: 400px; overflow-y: auto; background: white; border: 1px solid #ccc; padding: 10px; margin: 0 10px; }
+        #timer { font-size: 18px; font-weight: bold; }
+        .side-panel { display: flex; flex-direction: column; justify-content: space-between; height: 400px; }
+        @media (max-width: 600px) { #board { width: 300px; height: 300px; } .side-panel { flex-direction: row; height: auto; } }
+        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 1px solid #ccc; z-index: 1000; }
+        .modal button { margin: 5px; }
+    </style>
 </head>
 <body>
-  <div id="container">
-    <header>
-      <h1>♜ Retro 3D Chess ♜</h1>
-    </header>
+    <h1>Retro 3D Chess</h1>
+    <div style="display: flex; align-items: flex-start; gap: 20px;">
+        <div id="board"></div>
+        <div class="side-panel">
+            <div>
+                <div>Difficulty: <select id="difficulty"><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
+                <div>Time Control: <input type="number" id="timeControl" value="10" min="1"> minutes</div>
+                <div>Theme: <button onclick="toggleTheme()">Toggle Light/Dark</button></div>
+                <button onclick="newGame()">New Game</button>
+                <button onclick="undoMove()" id="undoBtn">Undo</button>
+            </div>
+            <div id="timer">White: 10:00 | Black: 10:00</div>
+            <div id="status">White to move</div>
+            <div id="history">Move History:<br></div>
+        </div>
+    </div>
+    <div id="promotionModal" class="modal">
+        <p>Promote Pawn To:</p>
+        <button onclick="promote('q')">Queen</button>
+        <button onclick="promote('r')">Rook</button>
+        <button onclick="promote('b')">Bishop</button>
+        <button onclick="promote('n')">Knight</button>
+    </div>
 
-    <section id="controls">
-      <label>Player Color:
-        <select id="playerColor">
-          <option value="white">White</option>
-          <option value="black">Black</option>
-        </select>
-      </label>
-      <label>AI Level:
-        <select id="aiLevel">
-          <option value="1">Easy</option>
-          <option value="5">Medium</option>
-          <option value="10">Hard</option>
-        </select>
-      </label>
-      <label>Time Control:
-        <select id="timeControl">
-          <option value="60">Bullet (1 min)</option>
-          <option value="180">Blitz (3 min)</option>
-          <option value="300">Blitz (5 min)</option>
-          <option value="600">Rapid (10 min)</option>
-        </select>
-      </label>
-      <div class="buttons">
-        <button id="startBtn">Start Game</button>
-        <button id="undoBtn">Undo</button>
-        <button id="redoBtn">Redo</button>
-      </div>
-    </section>
+    <script>
+        let game = new Chess();
+        let board = null;
+        let playerColor = 'w'; // Human is white
+        let aiColor = 'b';
+        let timeControl = 600; // seconds
+        let whiteTime = timeControl;
+        let blackTime = timeControl;
+        let timerInterval = null;
+        let currentTurn = 'w';
+        let moveHistory = [];
+        let undoStack = [];
+        let difficulty = 2; // Default medium
+        let boardTheme = 'w'; // w=light, b=dark
+        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-    <section id="clocks">
-      <div id="whiteClock">White: 01:00</div>
-      <div id="blackClock">Black: 01:00</div>
-    </section>
+        function playSound(frequency, duration) {
+            let oscillator = audioCtx.createOscillator();
+            oscillator.connect(audioCtx.destination);
+            oscillator.frequency.value = frequency;
+            oscillator.start();
+            setTimeout(() => oscillator.stop(), duration);
+        }
 
-    <section id="board-container"></section>
+        function initBoard() {
+            const config = {
+                draggable: true,
+                position: 'start',
+                onDragStart: onDragStart,
+                onDrop: onDrop,
+                onSnapEnd: onSnapEnd,
+                pieceTheme: `https://chessboardjs.com/img/chesspieces/${boardTheme === 'w' ? 'wikipedia' : 'merida'}/{piece}.png`
+            };
+            board = Chessboard('board', config);
+        }
 
-    <section id="history">
-      <h2>Move History</h2>
-      <div id="historyLog"></div>
-    </section>
-  </div>
+        function onDragStart(source, piece) {
+            if (game.game_over()) return false;
+            if ((playerColor === 'w' && currentTurn !== 'w') || (playerColor === 'b' && currentTurn !== 'b')) return false;
+            if ((currentTurn === 'w' && piece.search(/^b/) !== -1) || (currentTurn === 'b' && piece.search(/^w/) !== -1)) return false;
+        }
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chess.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/nmrugg/stockfish.js/stockfish.js"></script>
-  <script src="script.js"></script>
+        function onDrop(source, target) {
+            let move = game.move({ from: source, to: target, promotion: 'q' });
+            if (move === null) return 'snapback';
+            undoStack.push({ from: source, to: target, captured: move.captured });
+            updateHistory(move);
+            updateStatus();
+            if (game.turn() === aiColor) setTimeout(makeAIMove, 250);
+        }
+
+        function onSnapEnd() { board.position(game.fen()); }
+
+        function makeAIMove() {
+            if (game.game_over()) return;
+            let depth = difficulty === 0 ? 0 : difficulty === 1 ? 2 : difficulty === 2 ? 4 : 6;
+            let bestMove = getBestMove(depth);
+            game.move(bestMove);
+            undoStack.push({ from: bestMove.from, to: bestMove.to, captured: bestMove.captured });
+            updateHistory(bestMove);
+            board.position(game.fen());
+            updateStatus();
+            playSound(200, 100); // AI move sound
+        }
+
+        // Simple minimax for AI
+        function getBestMove(depth) {
+            let best = null;
+            let bestValue = depth % 2 === 0 ? -Infinity : Infinity;
+            let moves = game.moves({ verbose: true });
+            for (let move of moves) {
+                game.move(move);
+                let value = minimax(depth - 1, -Infinity, Infinity);
+                game.undo();
+                if (depth % 2 === 0 && value > bestValue) { bestValue = value; best = move; }
+                if (depth % 2 !== 0 && value < bestValue) { bestValue = value; best = move; }
+            }
+            if (depth === 0) { // Random for easy
+                return moves[Math.floor(Math.random() * moves.length)];
+            }
+            return best;
+        }
+
+        function minimax(depth, alpha, beta) {
+            if (depth === 0 || game.game_over()) return evaluateBoard();
+            let moves = game.moves({ verbose: true });
+            if (game.turn() === 'w') {
+                let maxEval = -Infinity;
+                for (let move of moves) {
+                    game.move(move);
+                    let eval = minimax(depth - 1, alpha, beta);
+                    game.undo();
+                    maxEval = Math.max(maxEval, eval);
+                    alpha = Math.max(alpha, eval);
+                    if (beta <= alpha) break;
+                }
+                return maxEval;
+            } else {
+                let minEval = Infinity;
+                for (let move of moves) {
+                    game.move(move);
+                    let eval = minimax(depth - 1, alpha, beta);
+                    game.undo();
+                    minEval = Math.min(minEval, eval);
+                    beta = Math.min(beta, eval);
+                    if (beta <= alpha) break;
+                }
+                return minEval;
+            }
+        }
+
+        function evaluateBoard() {
+            let total = 0;
+            let fen = game.fen().split(' ')[0];
+            let pieceValues = { p: -1, n: -3, b: -3, r: -5, q: -9, k: 0, P: 1, N: 3, B: 3, R: 5, Q: 9, K: 0 };
+            for (let row of fen.split('/')) {
+                for (let piece of row.replace(/\d/g, '')) total += pieceValues[piece] || 0;
+            }
+            return total;
+        }
+
+        function updateHistory(move) {
+            moveHistory.push(move.san);
+            let historyEl = document.getElementById('history');
+            historyEl.innerHTML = 'Move History:<br>' + moveHistory.map((m, i) => (Math.floor(i/2)+1) + '. ' + m).join('<br>');
+            historyEl.scrollTop = historyEl.scrollHeight;
+            playSound(move.captured ? 150 : 300, 100); // Capture vs move sound
+        }
+
+        function updateStatus() {
+            let status = '';
+            if (game.in_checkmate()) status = `Game over! ${game.turn() === 'w' ? 'Black' : 'White'} wins by checkmate.`;
+            else if (game.in_draw()) status = 'Draw!';
+            else if (game.in_check()) status = `${currentTurn === 'w' ? 'White' : 'Black'} is in check.`;
+            else status = `${currentTurn === 'w' ? 'White' : 'Black'} to move`;
+            document.getElementById('status').innerHTML = status;
+            currentTurn = game.turn();
+        }
+
+        function updateTimer() {
+            if (currentTurn === 'w') whiteTime--;
+            else blackTime--;
+            let wMin = Math.floor(whiteTime / 60), wSec = whiteTime % 60;
+            let bMin = Math.floor(blackTime / 60), bSec = blackTime % 60;
+            document.getElementById('timer').innerHTML = `White: ${wMin}:${wSec.toString().padStart(2,'0')} | Black: ${bMin}:${bSec.toString().padStart(2,'0')}`;
+            if (whiteTime <= 0 || blackTime <= 0) {
+                clearInterval(timerInterval);
+                alert(`${whiteTime <= 0 ? 'Black' : 'White'} wins on time!`);
+            }
+        }
+
+        function newGame() {
+            game.reset();
+            board.start();
+            moveHistory = [];
+            undoStack = [];
+            whiteTime = blackTime = timeControl;
+            currentTurn = 'w';
+            document.getElementById('history').innerHTML = 'Move History:<br>';
+            updateStatus();
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(updateTimer, 1000);
+            updateTimer();
+            document.getElementById('undoBtn').disabled = false;
+        }
+
+        function undoMove() {
+            if (undoStack.length === 0 || moveHistory.length % 2 === 0) return; // Only undo player moves
+            game.undo();
+            let lastMove = undoStack.pop();
+            board.position(game.fen());
+            moveHistory.pop();
+            document.getElementById('history').innerHTML = 'Move History:<br>' + moveHistory.map((m, i) => (Math.floor(i/2)+1) + '. ' + m).join('<br>');
+            updateStatus();
+            if (currentTurn === aiColor) makeAIMove(); // AI responds to undo
+        }
+
+        function promote(piece) {
+            game.undo(); // Undo temp move
+            game.move({ from: undoStack[undoStack.length-1].from, to: undoStack[undoStack.length-1].to, promotion: piece });
+            undoStack.pop();
+            undoStack.push({ from: undoStack[undoStack.length-1].from, to: undoStack[undoStack.length-1].to, captured: null }); // Update
+            board.position(game.fen());
+            updateHistory(game.history({ verbose: true }).pop());
+            document.getElementById('promotionModal').style.display = 'none';
+            updateStatus();
+            if (game.turn() === aiColor) setTimeout(makeAIMove, 250);
+        }
+
+        // Temp promotion move triggers modal
+        function onDrop(source, target) {
+            let tempMove = game.move({ from: source, to: target });
+            if (tempMove === null) {
+                game.undo();
+                return 'snapback';
+            }
+            if (tempMove.flags.includes('p') && ((tempMove.to.charAt(1) === '8' && playerColor === 'w') || (tempMove.to.charAt(1) === '1' && playerColor === 'b'))) {
+                document.getElementById('promotionModal').style.display = 'block';
+                game.undo();
+                return; // Wait for promotion
+            }
+            // Normal move logic...
+            undoStack.push(tempMove);
+            updateHistory(tempMove);
+            updateStatus();
+            if (game.turn() === aiColor) setTimeout(makeAIMove, 250);
+        }
+
+        function toggleTheme() {
+            boardTheme = boardTheme === 'w' ? 'b' : 'w';
+            initBoard(); // Reinit with new theme
+            board.position(game.fen());
+        }
+
+        document.getElementById('difficulty').addEventListener('change', (e) => {
+            difficulty = { Easy: 0, Medium: 1, Hard: 2 }[e.target.value];
+        });
+
+        document.getElementById('timeControl').addEventListener('change', (e) => {
+            timeControl = parseInt(e.target.value) * 60;
+            whiteTime = blackTime = timeControl;
+            updateTimer();
+        });
+
+        // Init
+        initBoard();
+        newGame();
+    </script>
 </body>
 </html>
