@@ -67,6 +67,7 @@ select, button {
   height: 400px;
   margin: 1em 0;
   border: 2px solid #0ff;
+  overflow: hidden;
 }
 
 #history {
