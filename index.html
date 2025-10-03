@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Retro 3D Chess</title>
+    <title>Retro Console Chess</title>
     <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
     <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.0/chess.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/stockfish@15.0.0/stockfish.js"></script> <!-- Fixed CDN for Stockfish -->
+    <script src="https://cdn.jsdelivr.net/npm/stockfish@15.0.0/stockfish.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
             font-family: 'VT323', monospace;
-            background: #000;
+            background: #1a1a1a url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAG0lEQVR4nGNgYGBgYGD4//8/AQ4ODhYGBgYGAP7BA/7i+8aIAAAAAElFTkSuQmCC') repeat; /* Console texture */
             color: #0f0;
             margin: 0;
             padding: 20px;
             display: flex;
-            justify-content: center;
-            align-items: flex-start;
+            flex-direction: column;
+            align-items: center;
             min-height: 100vh;
             position: relative;
             overflow: hidden;
@@ -32,49 +32,69 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: repeating-linear-gradient(transparent 0 2px, rgba(0, 255, 0, 0.1) 2px 4px);
+            background: repeating-linear-gradient(transparent 0 2px, rgba(0, 255, 0, 0.15) 2px 4px);
             pointer-events: none;
-            z-index: 1;
+            z-index: 5;
+        }
+        .navbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            background: #111;
+            border: 3px solid #0f0;
+            padding: 10px;
+            box-shadow: 0 0 15px #0f0;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 600px;
+            z-index: 10;
         }
         .container {
             display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            max-width: 1200px;
+            flex-direction: column;
+            align-items: center;
+            max-width: 600px;
             width: 100%;
             position: relative;
             z-index: 2;
         }
+        .console-frame {
+            background: #222;
+            border: 10px solid #333;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 0 20px #0f0, inset 0 0 10px #0f0;
+            position: relative;
+            width: fit-content;
+        }
+        .console-frame::before {
+            content: 'Retro Chess Console';
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 20px;
+            font-weight: bold;
+            color: #0f0;
+            text-shadow: 0 0 5px #0f0;
+        }
         #board {
             width: 500px !important;
             height: 500px !important;
-            border: 4px solid #0f0;
-            box-shadow: 0 0 20px #0f0, inset 0 0 10px #0f0;
-            background: #111;
-            position: relative;
-        }
-        .sidebar {
-            flex: 1;
-            min-width: 250px;
-            background: #111;
-            border: 2px solid #0f0;
-            padding: 20px;
-            box-shadow: 0 0 10px #0f0;
-        }
-        .controls {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+            background: repeating-linear-gradient(45deg, #333, #333 10px, #555 10px, #555 20px); /* Pixelated board */
+            box-shadow: inset 0 0 10px #0f0;
         }
         button {
-            padding: 10px;
+            padding: 8px 12px;
             background: #0f0;
             color: #000;
             border: 2px solid #0f0;
             border-radius: 0;
             cursor: pointer;
             font-family: 'VT323', monospace;
-            font-size: 18px;
+            font-size: 20px;
+            font-weight: bold;
             text-transform: uppercase;
             transition: background 0.2s;
         }
@@ -87,32 +107,37 @@
             border: 2px solid #0f0;
             border-radius: 0;
             font-family: 'VT323', monospace;
-            font-size: 16px;
+            font-size: 20px;
+            font-weight: bold;
         }
         #status {
-            font-size: 1.5em;
+            font-size: 24px;
             text-align: center;
             margin: 10px 0;
             text-shadow: 0 0 5px #0f0;
         }
         #timer {
-            font-size: 1.2em;
+            font-size: 20px;
             text-align: center;
             background: #111;
             border: 2px solid #0f0;
-            padding: 10px;
-            margin-bottom: 10px;
+            padding: 8px;
+            margin: 10px 0;
             box-shadow: 0 0 5px #0f0;
+            width: 100%;
+            max-width: 500px;
         }
         #history {
-            max-height: 200px;
+            max-height: 150px;
             overflow-y: auto;
             background: #111;
             border: 2px solid #0f0;
             padding: 10px;
             margin-top: 10px;
             color: #0f0;
-            font-size: 16px;
+            font-size: 18px;
+            width: 100%;
+            max-width: 500px;
         }
         .modal {
             display: none;
@@ -121,13 +146,14 @@
             left: 50%;
             transform: translate(-50%, -50%);
             background: #111;
-            border: 2px solid #0f0;
+            border: 3px solid #0f0;
             padding: 20px;
-            box-shadow: 0 0 10px #0f0;
+            box-shadow: 0 0 15px #0f0;
             z-index: 1000;
             color: #0f0;
             font-family: 'VT323', monospace;
-            font-size: 18px;
+            font-size: 22px;
+            font-weight: bold;
         }
         .modal button {
             margin: 5px;
@@ -143,7 +169,7 @@
             color: #0f0;
             border: 2px solid #0f0;
             font-family: 'VT323', monospace;
-            font-size: 16px;
+            font-size: 18px;
             resize: none;
         }
         @keyframes shake {
@@ -151,37 +177,33 @@
             50% { transform: translateX(-10px); }
         }
         .error { animation: shake 0.3s; }
-        @media (max-width: 800px) {
+        @media (max-width: 600px) {
+            .navbar { flex-direction: column; align-items: center; }
             #board { width: 350px !important; height: 350px !important; }
-            .container { flex-direction: column; align-items: center; }
-            .sidebar { width: 100%; max-width: 350px; }
+            .console-frame { padding: 10px; }
+            #timer, #history { max-width: 350px; }
         }
     </style>
 </head>
 <body>
+    <div class="navbar">
+        <select id="difficulty">
+            <option>Easy</option>
+            <option selected>Medium</option>
+            <option>Hard</option>
+        </select>
+        <input type="number" id="timeControl" value="10" min="1">
+        <button onclick="toggleTheme()">Theme</button>
+        <button onclick="newGame()">New Game</button>
+        <button onclick="undoMove()" id="undoBtn" disabled>Undo</button>
+    </div>
     <div class="container">
-        <div>
-            <div id="timer">White: 10:00 | Black: 10:00</div>
+        <div id="timer">White: 10:00 | Black: 10:00</div>
+        <div class="console-frame">
             <div id="board"></div>
-            <div id="status">Loading Retro 3D Chess...</div>
-            <div id="history">Move History:<br></div>
         </div>
-        <div class="sidebar">
-            <h2>Retro 3D Chess</h2>
-            <div class="controls">
-                <label for="difficulty">Difficulty:</label>
-                <select id="difficulty">
-                    <option>Easy</option>
-                    <option selected>Medium</option>
-                    <option>Hard</option>
-                </select>
-                <label for="timeControl">Time (min):</label>
-                <input type="number" id="timeControl" value="10" min="1">
-                <button onclick="toggleTheme()">Toggle Green/Amber</button>
-                <button onclick="newGame()">New Game</button>
-                <button onclick="undoMove()" id="undoBtn" disabled>Undo</button>
-            </div>
-        </div>
+        <div id="status">White to Move (Drag to start clock)</div>
+        <div id="history">Move History:<br></div>
     </div>
     <div id="promotionModal" class="modal">
         <p>Promote Pawn To:</p>
@@ -233,9 +255,18 @@
             setTimeout(() => oscillator.stop(), duration);
         }
 
+        function playGameOverSound() {
+            const freqs = [440, 330, 220, 110];
+            let delay = 0;
+            freqs.forEach((freq, i) => {
+                setTimeout(() => playSound(freq, 200), delay);
+                delay += 200;
+            });
+        }
+
         function initStockfish() {
             if (typeof Stockfish === 'undefined') {
-                console.warn('Stockfish not loaded - using minimax fallback');
+                console.warn('Stockfish not loaded - using minimax');
                 fallbackMinimax = true;
                 return Promise.resolve();
             }
@@ -265,17 +296,22 @@
         }
 
         function initBoard() {
-            const config = {
-                draggable: true,
-                position: 'start',
-                onDragStart: onDragStart,
-                onDrop: onDrop,
-                onSnapEnd: onSnapEnd,
-                moveSpeed: 100,
-                pieceTheme: `https://chessboardjs.com/img/chesspieces/${boardTheme === 'green' ? 'alpha' : 'cburnett'}/{piece}.png`
-            };
-            board = Chessboard('board', config);
-            document.getElementById('status').innerHTML = 'White to Move (Drag to start clock)';
+            try {
+                const config = {
+                    draggable: true,
+                    position: 'start',
+                    onDragStart: onDragStart,
+                    onDrop: onDrop,
+                    onSnapEnd: onSnapEnd,
+                    moveSpeed: 100,
+                    pieceTheme: `https://chessboardjs.com/img/chesspieces/pixel/{piece}.png` // Pixelated pieces
+                };
+                board = Chessboard('board', config);
+                document.getElementById('status').innerHTML = 'White to Move (Drag to start clock)';
+            } catch (e) {
+                console.error('Chessboard init failed:', e);
+                alert('Board load error. Check console (F12).');
+            }
         }
 
         function onDragStart(source, piece) {
@@ -297,16 +333,17 @@
                 playSound(100, 100);
                 return 'snapback';
             }
-            if (move.flags.includes('p')) {
+            if (move.flags.includes('p') && (move.to[1] === '8' || move.to[1] === '1')) {
+                undoStack.push(move);
                 document.getElementById('promotionModal').style.display = 'block';
-                return; // Wait for promotion
+                return;
             }
             undoStack.push(move);
             updateHistory(move);
             updateStatus();
             playSound(move.captured ? 220 : 440, 100);
-            if (game.turn() === aiColor) {
-                timerPaused = true;
+            timerPaused = true;
+            if (game.turn() === aiColor && !game.game_over()) {
                 setTimeout(makeAIMove, 250);
             } else {
                 timerPaused = false;
@@ -322,16 +359,15 @@
             aiThinking = true;
             document.getElementById('status').innerHTML = 'AI Thinking...';
             if (fallbackMinimax) {
-                // Improved minimax fallback
                 let depth = difficulty === 0 ? 2 : difficulty === 1 ? 3 : 4;
                 let moves = game.moves({ verbose: true });
                 let best = moves[0];
-                let bestValue = -Infinity;
+                let bestValue = game.turn() === 'w' ? -Infinity : Infinity;
                 for (let move of moves) {
                     game.move(move);
-                    let value = minimax(depth - 1, -Infinity, Infinity, false);
+                    let value = minimax(depth - 1, -Infinity, Infinity, game.turn() === 'w');
                     game.undo();
-                    if (value > bestValue) {
+                    if ((game.turn() === 'w' && value > bestValue) || (game.turn() === 'b' && value < bestValue)) {
                         bestValue = value;
                         best = move;
                     }
@@ -341,17 +377,16 @@
                 updateHistory(best);
                 board.position(game.fen());
                 playSound(440, 100);
+                aiThinking = false;
+                timerPaused = false;
+                updateStatus();
             } else if (stockfish) {
                 stockfish.postMessage('position fen ' + game.fen());
                 let movetime = moveTimes[document.getElementById('difficulty').value];
                 stockfish.postMessage('go movetime ' + movetime);
             }
-            aiThinking = false;
-            timerPaused = false;
-            updateStatus();
         }
 
-        // Simple minimax for fallback
         function minimax(depth, alpha, beta, maximizing) {
             if (depth === 0 || game.game_over()) return evaluateBoard();
             let moves = game.moves({ verbose: true });
@@ -383,7 +418,7 @@
         function evaluateBoard() {
             let total = 0;
             let fen = game.fen().split(' ')[0];
-            let values = { P: 1, N: 3, B: 3, R: 5, Q: 9, K: 0, p: -1, n: -3, b: -3, r: -5, q: -9, k: 0 };
+            let values = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 0, p: -100, n: -320, b: -330, r: -500, q: -900, k: 0 };
             let square = 0;
             for (let row of fen.split('/')) {
                 for (let char of row) {
@@ -394,12 +429,14 @@
                     }
                 }
             }
-            return total + (game.turn() === 'w' ? 50 : -50); // Tempo bonus
+            return total + (game.turn() === 'w' ? 10 : -10);
         }
 
         function updateHistory(move) {
             moveHistory.push(move.san);
-            document.getElementById('history').innerHTML = 'Move History:<br>' + moveHistory.map((m, i) => Math.floor(i/2)+1 + '. ' + m).join('<br>');
+            let historyEl = document.getElementById('history');
+            historyEl.innerHTML = 'Move History:<br>' + moveHistory.map((m, i) => `${Math.floor(i/2)+1}. ${m}`).join('<br>');
+            historyEl.scrollTop = historyEl.scrollHeight;
         }
 
         function updateStatus() {
@@ -407,17 +444,18 @@
             if (game.in_checkmate()) {
                 status = `Game Over! ${game.turn() === 'w' ? 'Black' : 'White'} Wins!`;
                 showGameOverModal(status);
-                playSound(660, 300);
+                playGameOverSound();
             } else if (game.in_draw()) {
                 status = 'Game Over! Draw.';
                 showGameOverModal(status);
+                playGameOverSound();
             } else if (game.in_check()) {
-                status = (currentTurn === 'w' ? 'White' : 'Black') + ' in Check!';
-                playSound(660, 200);
+                status = `${currentTurn === 'w' ? 'White' : 'Black'} in Check!`;
+                playSound(880, 200);
             } else {
-                status = (currentTurn === 'w' ? 'White' : 'Black') + ' to Move';
+                status = `${currentTurn === 'w' ? 'White' : 'Black'} to Move`;
             }
-            document.getElementById('status').innerHTML = status;
+            if (!aiThinking) document.getElementById('status').innerHTML = status;
             currentTurn = game.turn();
             if (bestMove && !aiThinking) {
                 let move = game.move(bestMove);
@@ -425,7 +463,7 @@
                     undoStack.push(move);
                     updateHistory(move);
                     board.position(game.fen());
-                    playSound(440, 100);
+                    playSound(move.captured ? 220 : 440, 100);
                 }
                 bestMove = null;
             }
@@ -440,7 +478,8 @@
             document.getElementById('timer').innerHTML = `White: ${wMin}:${wSec.toString().padStart(2,'0')} | Black: ${bMin}:${bSec.toString().padStart(2,'0')}`;
             if (whiteTime <= 0 || blackTime <= 0) {
                 clearInterval(timerInterval);
-                showGameOverModal((whiteTime <= 0 ? 'Black' : 'White') + ' Wins on Time!');
+                showGameOverModal(`${whiteTime <= 0 ? 'Black' : 'White'} Wins on Time!`);
+                playGameOverSound();
             }
         }
 
@@ -469,10 +508,10 @@
             undoStack.pop();
             moveHistory.pop();
             board.position(game.fen());
-            document.getElementById('history').innerHTML = 'Move History:<br>' + moveHistory.map((m, i) => Math.floor(i/2)+1 + '. ' + m).join('<br>');
+            document.getElementById('history').innerHTML = 'Move History:<br>' + moveHistory.map((m, i) => `${Math.floor(i/2)+1}. ${m}`).join('<br>');
             updateStatus();
             playSound(440, 100);
-            document.getElementById('undoBtn').disabled = undoStack.length === 0;
+            document.getElementById('undoBtn').disabled = true;
         }
 
         function promote(piece) {
@@ -484,7 +523,7 @@
             updateHistory(move);
             document.getElementById('promotionModal').style.display = 'none';
             updateStatus();
-            if (game.turn() === aiColor) setTimeout(makeAIMove, 250);
+            if (game.turn() === aiColor && !game.game_over()) setTimeout(makeAIMove, 250);
         }
 
         function showGameOverModal(result) {
@@ -508,13 +547,10 @@
             boardTheme = boardTheme === 'green' ? 'amber' : 'green';
             let color = boardTheme === 'green' ? '#0f0' : '#ffa500';
             document.body.style.color = color;
-            document.querySelectorAll('button:not(:disabled)').forEach(b => {
-                b.style.background = color;
-                b.style.borderColor = color;
-            });
-            document.querySelectorAll('select, input, #timer, #history, .modal').forEach(el => {
-                el.style.color = color;
+            document.querySelectorAll('button:not(:disabled), select, input, #timer, #history, .modal').forEach(el => {
+                el.style.background = el.tagName === 'BUTTON' && !el.disabled ? color : '#111';
                 el.style.borderColor = color;
+                el.style.color = color;
             });
             document.getElementById('status').style.textShadow = `0 0 5px ${color}`;
             initBoard();
@@ -522,6 +558,7 @@
         }
 
         document.getElementById('difficulty').addEventListener('change', (e) => {
+            difficulty = { Easy: 0, Medium: 1, Hard: 2 }[e.target.value];
             if (stockfish && !fallbackMinimax) stockfish.postMessage(`setoption name Skill Level value ${skillLevels[e.target.value]}`);
         });
 
@@ -531,7 +568,6 @@
             updateTimer();
         });
 
-        // Init
         async function init() {
             try {
                 await initStockfish();
@@ -540,7 +576,7 @@
                 newGame();
             } catch (e) {
                 console.error('Init failed:', e);
-                alert('Load error - try refreshing. Console (F12) for details.');
+                alert('Load error. Try refreshing or check console (F12).');
                 fallbackMinimax = true;
                 initBoard();
                 newGame();
