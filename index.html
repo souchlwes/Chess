@@ -139,6 +139,18 @@
             font-size: 16px;
             resize: none;
         }
+        #youtube-player {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            height: 200px;
+            z-index: 2000;
+            border: 3px solid #0f0;
+            box-shadow: 0 0 15px #0f0;
+        }
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
             50% { transform: translateX(-10px); }
@@ -149,6 +161,7 @@
             .navbar { max-width: 350px; gap: 10px; }
             .console-frame { padding: 15px; }
             #timer, #history { max-width: 350px; }
+            #youtube-player { width: 200px; height: 150px; }
         }
     </style>
 </head>
@@ -189,6 +202,9 @@
         <button onclick="copyPGN()">Copy PGN</button>
         <button onclick="closeGameOverModal()">Close</button>
     </div>
+    <div id="youtube-player">
+        <iframe id="yt-player" width="100%" height="100%" src="https://www.youtube.com/embed/dQ1vX9Y6dTA?autoplay=1&mute=1" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    </div>
 
     <script>
         let game = new Chess();
@@ -219,6 +235,16 @@
             setTimeout(() => oscillator.stop(), duration);
         }
 
+        function playYouTube() {
+            let player = document.getElementById('yt-player');
+            if (player) {
+                player.src += '&mute=0'; // Unmute and replay
+                document.getElementById('youtube-player').style.display = 'block';
+            } else {
+                console.error('YouTube player not found');
+            }
+        }
+
         function initBoard() {
             try {
                 const config = {
@@ -228,14 +254,14 @@
                     onDrop: onDrop,
                     onSnapEnd: onSnapEnd,
                     moveSpeed: 200,
-                    pieceTheme: `https://chessboardjs.com/img/chesspieces/${boardTheme === 'green' ? 'alpha' : 'merida'}/{piece}.png` // Stable pixel-like set
+                    pieceTheme: `https://chessboardjs.com/img/chesspieces/${boardTheme === 'green' ? 'alpha' : 'merida'}/{piece}.png`
                 };
                 board = Chessboard('board', config);
                 document.getElementById('status').innerHTML = 'White to Move (Drag to start clock)';
                 console.log('Board initialized successfully');
             } catch (e) {
                 console.error('Board init failed:', e);
-                document.getElementById('status').innerHTML = 'Board failed to load. Refresh page.';
+                document.getElementById('status').innerHTML = 'Board failed to load. Refresh page or check console.';
             }
         }
 
@@ -248,7 +274,7 @@
             if (!gameStarted) {
                 gameStarted = true;
                 timerPaused = false;
-                if (!timerInterval) timerInterval = setInterval(updateTimer, 1000);
+                if (!timerInterval) timerInterval = setInterval(updateTimer, 100);
                 updateTimer();
             }
             let tempMove = game.move({ from: source, to: target });
@@ -269,6 +295,7 @@
             playSound(tempMove.captured ? 150 : 300, 100);
             timerPaused = true;
             if (game.turn() === aiColor && !game.game_over()) setTimeout(makeAIMove, 500);
+            else timerPaused = false;
         }
 
         function onSnapEnd() {
@@ -279,7 +306,7 @@
             if (game.game_over()) return;
             aiThinking = true;
             document.getElementById('status').innerHTML = 'AI Thinking...';
-            let depth = difficulty === 0 ? 2 : difficulty === 1 ? 3 : 4;
+            let depth = difficulty === 0 ? 3 : difficulty === 1 ? 5 : 7;
             let bestMove = getBestMove(depth);
             if (bestMove) {
                 game.move(bestMove);
@@ -295,27 +322,30 @@
 
         function getBestMove(depth) {
             let moves = game.moves({ verbose: true });
-            if (depth === 0) return moves[Math.floor(Math.random() * moves.length)];
+            if (depth === 0 || moves.length === 0) return moves[Math.floor(Math.random() * moves.length)];
             let best = null;
             let bestValue = game.turn() === 'w' ? -Infinity : Infinity;
             for (let move of moves) {
                 game.move(move);
-                let value = minimax(depth - 1, -Infinity, Infinity);
+                let value = minimax(depth - 1, -Infinity, Infinity, game.turn() === 'w');
                 game.undo();
-                if (game.turn() === 'w' && value > bestValue) { bestValue = value; best = move; }
-                if (game.turn() === 'b' && value < bestValue) { bestValue = value; best = move; }
+                if ((game.turn() === 'w' && value > bestValue) || (game.turn() === 'b' && value < bestValue)) {
+                    bestValue = value;
+                    best = move;
+                }
             }
+            if (best && game.in_check() && game.moves().length === 0) return best;
             return best;
         }
 
-        function minimax(depth, alpha, beta) {
+        function minimax(depth, alpha, beta, maximizing) {
             if (depth === 0 || game.game_over()) return evaluateBoard();
             let moves = game.moves({ verbose: true });
-            if (game.turn() === 'w') {
+            if (maximizing) {
                 let maxEval = -Infinity;
                 for (let move of moves) {
                     game.move(move);
-                    let eval = minimax(depth - 1, alpha, beta);
+                    let eval = minimax(depth - 1, alpha, beta, false);
                     game.undo();
                     maxEval = Math.max(maxEval, eval);
                     alpha = Math.max(alpha, eval);
@@ -326,7 +356,7 @@
                 let minEval = Infinity;
                 for (let move of moves) {
                     game.move(move);
-                    let eval = minimax(depth - 1, alpha, beta);
+                    let eval = minimax(depth - 1, alpha, beta, true);
                     game.undo();
                     minEval = Math.min(minEval, eval);
                     beta = Math.min(beta, eval);
@@ -337,13 +367,26 @@
         }
 
         function evaluateBoard() {
+            if (game.in_checkmate()) return game.turn() === 'w' ? -100000 : 100000;
             let total = 0;
             let fen = game.fen().split(' ')[0];
             let pieceValues = { p: -1, n: -3, b: -3, r: -5, q: -9, k: 0, P: 1, N: 3, B: 3, R: 5, Q: 9, K: 0 };
             for (let row of fen.split('/')) {
                 for (let piece of row.replace(/\d/g, '')) total += pieceValues[piece] || 0;
             }
-            return total;
+            if (countPieces() < 6) {
+                let kingW = game.get('K').square;
+                let kingB = game.get('k').square;
+                let center = ['d4', 'e4', 'd5', 'e5'];
+                total += center.includes(kingW) ? 50 : 0;
+                total -= center.includes(kingB) ? 50 : 0;
+            }
+            return total + (game.turn() === 'w' ? 10 : -10);
+        }
+
+        function countPieces() {
+            let fen = game.fen().split(' ')[0];
+            return fen.replace(/[0-8]/g, '').length;
         }
 
         function updateHistory(move) {
@@ -369,14 +412,15 @@
             }
             if (!aiThinking) document.getElementById('status').innerHTML = status;
             currentTurn = game.turn();
+            document.getElementById('undoBtn').disabled = undoStack.length === 0 || moveHistory.length % 2 === 0;
         }
 
         function updateTimer() {
             if (timerPaused || !gameStarted) return;
-            if (currentTurn === 'w') whiteTime--;
-            else blackTime--;
-            let wMin = Math.floor(whiteTime / 60), wSec = whiteTime % 60;
-            let bMin = Math.floor(blackTime / 60), bSec = blackTime % 60;
+            if (currentTurn === 'w') whiteTime -= 0.1;
+            else blackTime -= 0.1;
+            let wMin = Math.floor(whiteTime / 60), wSec = Math.floor(whiteTime % 60);
+            let bMin = Math.floor(blackTime / 60), bSec = Math.floor(blackTime % 60);
             document.getElementById('timer').innerHTML = `White: ${wMin}:${wSec.toString().padStart(2,'0')} | Black: ${bMin}:${bSec.toString().padStart(2,'0')}`;
             if (whiteTime <= 0 || blackTime <= 0) {
                 clearInterval(timerInterval);
@@ -400,6 +444,7 @@
             document.getElementById('undoBtn').disabled = true;
             if (timerInterval) clearInterval(timerInterval);
             updateTimer();
+            document.getElementById('youtube-player').style.display = 'none';
         }
 
         function undoMove() {
@@ -425,6 +470,7 @@
             document.getElementById('promotionModal').style.display = 'none';
             updateStatus();
             if (game.turn() === aiColor && !game.game_over()) setTimeout(makeAIMove, 500);
+            else timerPaused = false;
         }
 
         function showGameOverModal(result) {
@@ -433,10 +479,12 @@
             document.getElementById('moveCount').innerHTML = Math.ceil(moveHistory.length / 2);
             document.getElementById('pgnOutput').value = game.pgn();
             document.getElementById('gameOverModal').style.display = 'block';
+            playYouTube();
         }
 
         function closeGameOverModal() {
             document.getElementById('gameOverModal').style.display = 'none';
+            document.getElementById('youtube-player').style.display = 'none';
             newGame();
         }
 
@@ -469,7 +517,6 @@
             updateTimer();
         });
 
-        // Init with delay to ensure DOM ready
         window.addEventListener('load', () => {
             setTimeout(initBoard, 500);
             newGame();
