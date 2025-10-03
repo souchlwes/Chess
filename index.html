@@ -9,6 +9,7 @@
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.0/chess.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stockfish.wasm@0.10.0/stockfish.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -219,10 +220,11 @@
         let aiThinking = false;
         let stockfish = null;
         let bestMove = null;
+        let fallbackRandom = false; // Fallback if Stockfish fails
 
         // Skill levels and movetimes for difficulties
-        const skillLevels = { Easy: 6, Medium: 12, Hard: 20 };
-        const moveTimes = { Easy: 500, Medium: 2000, Hard: 5000 }; // ms
+        const skillLevels = { Easy: 1, Medium: 6, Hard: 10 };
+        const moveTimes = { Easy: 300, Medium: 1000, Hard: 3000 }; // ms
 
         function playSound(frequency, duration) {
             let oscillator = audioCtx.createOscillator();
@@ -235,22 +237,48 @@
 
         function initStockfish() {
             return new Promise((resolve, reject) => {
-                stockfish = new Worker('https://cdn.jsdelivr.net/npm/stockfish@17.1.0/stockfish.wasm.js');
-                stockfish.onmessage = function(event) {
-                    const msg = event.data;
-                    if (msg.startsWith('bestmove')) {
-                        const moveUCI = msg.split(' ')[1];
-                        if (moveUCI && moveUCI !== '(none)') {
-                            bestMove = { from: moveUCI.substring(0, 2), to: moveUCI.substring(2, 4), promotion: moveUCI.length > 4 ? moveUCI[4] : undefined };
+                // Check WASM support
+                if (typeof WebAssembly !== 'object' || typeof WebAssembly.validate !== 'function') {
+                    console.warn('WASM not supported - falling back to random AI');
+                    fallbackRandom = true;
+                    resolve();
+                    return;
+                }
+                const wasmCheck = Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00);
+                if (!WebAssembly.validate(wasmCheck)) {
+                    console.warn('WASM validation failed - falling back to random AI');
+                    fallbackRandom = true;
+                    resolve();
+                    return;
+                }
+
+                Stockfish().then(sf => {
+                    stockfish = sf;
+                    stockfish.onmessage = function(event) {
+                        const msg = event.data;
+                        console.log('Stockfish:', msg); // Debug log
+                        if (msg.startsWith('bestmove')) {
+                            const moveUCI = msg.split(' ')[1];
+                            if (moveUCI && moveUCI !== '(none)') {
+                                bestMove = {
+                                    from: moveUCI.substring(0, 2),
+                                    to: moveUCI.substring(2, 4),
+                                    promotion: moveUCI.length > 4 ? moveUCI[4] : undefined
+                                };
+                            }
+                            aiThinking = false;
+                            timerPaused = false;
+                            updateStatus(); // Triggers move application
                         }
-                        aiThinking = false;
-                        timerPaused = false;
-                        updateStatus();
-                    }
-                };
-                stockfish.postMessage('uci');
-                stockfish.postMessage(`setoption name Skill Level value ${skillLevels[document.getElementById('difficulty').value]}`);
-                resolve();
+                    };
+                    stockfish.postMessage('uci');
+                    stockfish.postMessage(`setoption name Skill Level value ${skillLevels[document.getElementById('difficulty').value]}`);
+                    resolve();
+                }).catch(e => {
+                    console.error('Stockfish init failed:', e);
+                    fallbackRandom = true;
+                    resolve();
+                });
             });
         }
 
@@ -268,7 +296,6 @@
                 board = Chessboard('board', config);
             } catch (e) {
                 console.error('Chessboard init failed:', e);
-                alert('Board load error. Check console.');
             }
         }
 
@@ -313,14 +340,27 @@
             if (board) board.position(game.fen());
         }
 
-        async function makeAIMove() {
-            if (game.game_over() || !stockfish) return;
+        function makeAIMove() {
+            if (game.game_over()) return;
+            if (fallbackRandom) {
+                // Fallback: Random legal move
+                let moves = game.moves({ verbose: true });
+                let randomMove = moves[Math.floor(Math.random() * moves.length)];
+                game.move(randomMove);
+                undoStack.push(randomMove);
+                updateHistory(randomMove);
+                board.position(game.fen());
+                playSound(440, 100);
+                timerPaused = false;
+                updateStatus();
+                return;
+            }
+            if (!stockfish) return;
             aiThinking = true;
             document.getElementById('status').innerHTML = 'Stockfish Thinking...';
             stockfish.postMessage('position fen ' + game.fen());
             const movetime = moveTimes[document.getElementById('difficulty').value];
             stockfish.postMessage(`go movetime ${movetime}`);
-            // Wait for bestmove in onmessage handler
         }
 
         function updateHistory(move) {
@@ -347,7 +387,9 @@
             }
             if (!aiThinking) document.getElementById('status').innerHTML = status;
             currentTurn = game.turn();
-            if (bestMove && aiThinking === false) {
+
+            // Apply best move if ready
+            if (bestMove && !aiThinking) {
                 let moveObj = bestMove;
                 let sfMove = game.move(moveObj);
                 if (sfMove) {
@@ -355,7 +397,6 @@
                     updateHistory(sfMove);
                     board.position(game.fen());
                     playSound(440, 100);
-                    updateStatus();
                 }
                 bestMove = null;
             }
@@ -391,7 +432,6 @@
             document.getElementById('undoBtn').disabled = true;
             if (timerInterval) clearInterval(timerInterval);
             updateTimer();
-            // Reset Stockfish position
             if (stockfish) {
                 stockfish.postMessage('position startpos');
             }
@@ -413,9 +453,10 @@
         function promote(piece) {
             let lastMoveData = undoStack.pop();
             game.move({ from: lastMoveData.from, to: lastMoveData.to, promotion: piece });
-            undoStack.push(game.history({ verbose: true }).pop());
+            let promotedMove = game.history({ verbose: true }).pop();
+            undoStack.push(promotedMove);
             board.position(game.fen());
-            updateHistory(game.history({ verbose: true }).pop());
+            updateHistory(promotedMove);
             document.getElementById('promotionModal').style.display = 'none';
             updateStatus();
             if (game.turn() === aiColor && !game.game_over()) {
@@ -461,7 +502,8 @@
         }
 
         document.getElementById('difficulty').addEventListener('change', (e) => {
-            if (stockfish) {
+            difficulty = { Easy: 0, Medium: 1, Hard: 2 }[e.target.value];
+            if (stockfish && !fallbackRandom) {
                 stockfish.postMessage(`setoption name Skill Level value ${skillLevels[e.target.value]}`);
             }
         });
@@ -477,10 +519,12 @@
             try {
                 initBoard();
                 await initStockfish();
+                if (fallbackRandom) {
+                    document.getElementById('status').innerHTML += ' (Random AI - Update browser for Stockfish)';
+                }
                 newGame();
             } catch (e) {
                 console.error('Init failed:', e);
-                alert('Load error (Stockfish may need WASM support). Check console (F12).');
             }
         }
         init();
