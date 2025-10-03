@@ -78,9 +78,9 @@ function initBoard() {
   historyStack = [];
   redoStack = [];
   document.getElementById('board-container').innerHTML = '';
-  document.getElementById('history').innerHTML = '';
+  document.getElementById('historyLog').innerHTML = '';
   scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
   renderer = new THREE.WebGLRenderer();
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.getElementById('board-container').appendChild(renderer.domElement);
@@ -115,7 +115,7 @@ function animate() {
 }
 
 function updateBoard() {
-  document.getElementById('history').textContent = chess.history().join(' ');
+  document.getElementById('historyLog').textContent = chess.history().join(' ');
   updateClocks();
 }
 
@@ -139,4 +139,62 @@ function handleSquareClick(square) {
     const piece = chess.get(square);
     if (piece && piece.color === playerColor[0]) {
       selectedSquare = square;
-      highlightSquare(square, [43dcd9a7-70db-4a1f-b0ae-981daa162054](https://github.com/ruanvalente/origamid/tree/08d21800775d80bfbbc007cee39983bc81acf996/javascript-es6+%2Fmodulos%2Fmod-07%2Fmod-07.md?citationMarker=43dcd9a7-70db-4a1f-b0ae-981daa162054 "1")[43dcd9a7-70db-4a1f-b0ae-981daa162054](https://github.com/lzh-yi/Web-Fork-/tree/024b3e55587afdf9f05a677613a75f24e3d1803e/03-CSS%E8%BF%9B%E9%98%B6%2F04-%E5%A6%82%E4%BD%95%E8%AE%A9%E4%B8%80%E4%B8%AA%E5%85%83%E7%B4%A0%E6%B0%B4%E5%B9%B3%E5%9E%82%E7%9B%B4%E5%B1%85%E4%B8%AD%EF%BC%9F.md?citationMarker=43dcd9a7-70db-4a1f-b0ae-981daa162054 "2")[43dcd9a7-70db-4a1f-b0ae-981daa162054](https://github.com/perfectphony/test/tree/3c2f54fe916aebab8da9cf78c19aa984c3d5560d/poliphoni.js?citationMarker=43dcd9a7-70db-4a1f-b0ae-981daa162054 "3")[43dcd9a7-70db-4a1f-b0ae-981daa162054](https://github.com/alexandrkov90/buildMove/tree/3f1534a69ad6028c65692d34e0f43b57302ef2f5/build.js?citationMarker=43dcd9a7-70db-4a1f-b0ae-981daa162054 "4")
+      highlightSquare(square, 0x00ff00);
+    }
+  } else {
+    const move = { from: selectedSquare, to: square };
+    const result = chess.move(move);
+    clearHighlights();
+    selectedSquare = null;
+    if (result) {
+      historyStack.push(chess.fen());
+      updateBoard();
+      startTimer(chess.turn());
+      if (!chess.game_over() && chess.turn() === aiColor) makeAIMove();
+    }
+  }
+}
+
+function highlightSquare(square, color) {
+  squareMeshes[square].material.color.setHex(color);
+}
+
+function clearHighlights() {
+  for (const sq in squareMeshes) {
+    const i = 'abcdefgh'.indexOf(sq[0]);
+    const j = 8 - parseInt(sq[1]);
+    const baseColor = (i + j) % 2 === 0 ? 0xeeeeee : 0x222222;
+    squareMeshes[sq].material.color.setHex(baseColor);
+  }
+}
+
+function updateClocks() {
+  document.getElementById('whiteClock').textContent = `White: ${formatTime(whiteTime)}`;
+  document.getElementById('blackClock').textContent = `Black: ${formatTime(blackTime)}`;
+}
+
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const s = (seconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function startTimer(color) {
+  clearInterval(timerInterval);
+  activeTimer = color;
+  timerInterval = setInterval(() => {
+    if (color === 'w') {
+      whiteTime--;
+      if (whiteTime <= 0) endGame('Black wins on time!');
+    } else {
+      blackTime--;
+      if (blackTime <= 0) endGame('White wins on time!');
+    }
+    updateClocks();
+  }, 1000);
+}
+
+function endGame(message) {
+  clearInterval(timerInterval);
+  alert(message);
+}
