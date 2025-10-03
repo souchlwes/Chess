@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Retro Chess</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="menu">
+    <h1>♟️ Retro Chess</h1>
+    <label>Mode:
+      <select id="mode">
+        <option value="1v1">1 vs 1</option>
+        <option value="ai">1 vs AI</option>
+      </select>
+    </label>
+    <label>AI Level:
+      <select id="aiLevel">
+        <option value="easy">Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard">Hard</option>
+      </select>
+    </label>
+    <label>Player Color:
+      <select id="playerColor">
+        <option value="white">White</option>
+        <option value="black">Black</option>
+      </select>
+    </label>
+    <button onclick="startGame()">Start Game</button>
+  </div>
+
+  <div id="board" class="board"></div>
+
+  <script src="chess.js"></script>
+  <script src="ai.js"></script>
+</body>
+</html>
