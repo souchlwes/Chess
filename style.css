@@ -1,0 +1,44 @@
+body {
+  background-color: #111;
+  color: #0ff;
+  font-family: 'Courier New', monospace;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+}
+
+.menu {
+  padding: 1em;
+  background: #222;
+  border-bottom: 2px solid #0ff;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 50px);
+  grid-template-rows: repeat(8, 50px);
+  margin: 2em auto;
+  width: 400px;
+  border: 2px solid #0ff;
+}
+
+.square {
+  width: 50px;
+  height: 50px;
+  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.light {
+  background-color: #ccc;
+}
+
+.dark {
+  background-color: #666;
+}
+
+.selected {
+  outline: 2px solid yellow;
+}
