@@ -19,6 +19,7 @@ body {
 header h1 {
   margin-bottom: 0.5em;
   font-size: 1.2em;
+  text-shadow: 0 0 8px #0ff;
 }
 
 #controls {
@@ -42,6 +43,13 @@ select, button {
   padding: 0.5em;
   font-size: 0.8em;
   margin-top: 0.3em;
+  transition: all 0.2s ease-in-out;
+}
+
+button:hover {
+  background: #0ff;
+  color: #000;
+  box-shadow: 0 0 10px #0ff;
 }
 
 .buttons {
@@ -60,6 +68,7 @@ select, button {
   background: #111;
   border: 2px solid #0ff;
   padding: 0.5em 1em;
+  box-shadow: 0 0 6px #0ff;
 }
 
 #board-container {
@@ -68,6 +77,17 @@ select, button {
   margin: 1em 0;
   border: 2px solid #0ff;
   overflow: hidden;
+  box-shadow: 0 0 20px #0ff;
+  animation: glowPulse 2s infinite alternate;
+}
+
+@keyframes glowPulse {
+  from {
+    box-shadow: 0 0 10px #0ff;
+  }
+  to {
+    box-shadow: 0 0 20px #0ff;
+  }
 }
 
 #history {
@@ -81,4 +101,6 @@ select, button {
   max-height: 100px;
   overflow-y: auto;
   font-size: 0.6em;
+  scroll-behavior: smooth;
+  box-shadow: inset 0 0 10px #0ff;
 }
