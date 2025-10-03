@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Retro 3D Chess</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -19,17 +20,33 @@
       <label>AI Level:
         <select id="aiLevel">
           <option value="1">Easy</option>
-          <option value="3">Medium</option>
-          <option value="5">Hard</option>
+          <option value="5">Medium</option>
+          <option value="10">Hard</option>
+        </select>
+      </label>
+      <label>Time Control:
+        <select id="timeControl">
+          <option value="60">Bullet (1 min)</option>
+          <option value="180">Blitz (3 min)</option>
+          <option value="300">Blitz (5 min)</option>
+          <option value="600">Rapid (10 min)</option>
         </select>
       </label>
       <button id="startBtn">Start Game</button>
+      <button id="undoBtn">Undo</button>
+      <button id="redoBtn">Redo</button>
     </div>
+    <div id="clocks">
+      <div id="whiteClock">White: 01:00</div>
+      <div id="blackClock">Black: 01:00</div>
+    </div>
+    <div id="history"></div>
   </div>
   <div id="board-container"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chess.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/nmrugg/stockfish.js/stockfish.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
