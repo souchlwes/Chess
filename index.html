@@ -8,9 +8,12 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="ui">
-    <h1>♛ Retro 3D Chess ♜</h1>
-    <div class="controls">
+  <div id="container">
+    <header>
+      <h1>♛ Retro 3D Chess ♜</h1>
+    </header>
+
+    <section id="controls">
       <label>Player Color:
         <select id="playerColor">
           <option value="white">White</option>
@@ -32,17 +35,25 @@
           <option value="600">Rapid (10 min)</option>
         </select>
       </label>
-      <button id="startBtn">Start Game</button>
-      <button id="undoBtn">Undo</button>
-      <button id="redoBtn">Redo</button>
-    </div>
-    <div id="clocks">
+      <div class="buttons">
+        <button id="startBtn">Start Game</button>
+        <button id="undoBtn">Undo</button>
+        <button id="redoBtn">Redo</button>
+      </div>
+    </section>
+
+    <section id="clocks">
       <div id="whiteClock">White: 01:00</div>
       <div id="blackClock">Black: 01:00</div>
-    </div>
-    <div id="history"></div>
+    </section>
+
+    <section id="board-container"></section>
+
+    <section id="history">
+      <h2>Move History</h2>
+      <div id="historyLog"></div>
+    </section>
   </div>
-  <div id="board-container"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chess.js"></script>
