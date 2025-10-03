@@ -113,7 +113,6 @@ function initBoard() {
   updateBoard();
   window.addEventListener('click', onBoardClick);
 }
-
 function animate() {
   requestAnimationFrame(animate);
   renderer.render(scene, camera);
