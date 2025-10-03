@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Retro Handheld Chess</title>
+    <title>Retro Console Chess</title>
     <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
@@ -13,105 +13,86 @@
         * { box-sizing: border-box; }
         body {
             font-family: 'VT323', monospace;
-            background: #1a1a1a;
+            background: #1a1a1a url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAG0lEQVR4nGNgYGBgYGD4//8/AQ4ODhYGBgYGAP7BA/7i+8aIAAAAAElFTkSuQmCC') repeat;
             color: #0f0;
             margin: 0;
             padding: 20px;
             display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            overflow: hidden;
-        }
-        .console {
-            background: #888;
-            border: 5px solid #333;
-            border-radius: 10px;
-            width: 600px;
-            height: 400px;
-            position: relative;
-            box-shadow: 0 0 15px #0f0;
-            padding: 20px;
-            display: flex;
             flex-direction: column;
             align-items: center;
-        }
-        .screen {
-            background: #000;
-            border: 2px solid #0f0;
-            width: 500px;
-            height: 300px;
+            min-height: 100vh;
             position: relative;
             overflow: hidden;
         }
-        .screen::before {
+        body::before {
             content: '';
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: repeating-linear-gradient(transparent 0 2px, rgba(0, 255, 0, 0.1) 2px 4px);
+            background: repeating-linear-gradient(transparent 0 2px, rgba(0, 255, 0, 0.15) 2px 4px);
             pointer-events: none;
+            z-index: 5;
         }
-        .chessboard {
-            width: 300px !important;
-            height: 300px !important;
-            background: repeating-linear-gradient(45deg, #333 0 8px, #555 8px 16px);
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-        .controls-left {
-            position: absolute;
-            left: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-        }
-        .dpad {
-            width: 40px;
-            height: 40px;
-            background: #555;
-            border: 2px solid #0f0;
-            display: grid;
-            grid-template-areas:
-                "tl t tr"
-                "l  c  r"
-                "bl b br";
-            gap: 2px;
-        }
-        .dpad div { background: #333; width: 12px; height: 12px; }
-        .dpad .top { grid-area: t; }
-        .dpad .bottom { grid-area: b; }
-        .dpad .left { grid-area: l; }
-        .dpad .right { grid-area: r; }
-        .dpad .center { grid-area: c; }
-        .controls-right {
-            position: absolute;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-        }
-        .button {
-            width: 30px;
-            height: 30px;
-            background: #f00;
-            border: 2px solid #0f0;
-            border-radius: 50%;
-            margin: 10px 0;
-            text-align: center;
-            line-height: 30px;
-            color: #000;
-            font-weight: bold;
-        }
-        .button.a { background: #f00; }
-        .button.b { background: #00f; }
         .navbar {
             display: flex;
-            gap: 10px;
+            gap: 15px;
+            flex-wrap: wrap;
             justify-content: center;
-            margin-bottom: 10px;
+            background: #111;
+            border: 4px solid #0f0;
+            padding: 10px;
+            box-shadow: 0 0 15px #0f0;
+            margin-bottom: 30px;
+            width: 100%;
+            max-width: 600px;
+            z-index: 10;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 600px;
+            width: 100%;
+            position: relative;
+            z-index: 2;
+        }
+        .console-frame {
+            background: #222;
+            border: 15px solid #333;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 0 20px #0f0, inset 0 0 10px #0f0;
+            position: relative;
+            width: fit-content;
+        }
+        .console-frame::before {
+            content: 'Retro Chess Console';
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 22px;
+            font-weight: bold;
+            color: #0f0;
+            text-shadow: 0 0 5px #0f0;
+        }
+        .console-frame::after {
+            content: '●';
+            position: absolute;
+            top: -20px;
+            right: 20px;
+            color: #f00;
+            font-size: 16px;
+            text-shadow: 0 0 5px #f00;
+        }
+        .chessboard {
+            width: 500px !important;
+            height: 500px !important;
+            background: repeating-linear-gradient(45deg, #333, #333 10px, #555 10px, #555 20px);
+            box-shadow: inset 0 0 10px #0f0;
+            position: relative;
         }
         button, select, input[type="number"] {
             padding: 5px 10px;
@@ -129,14 +110,13 @@
         #history { max-height: 100px; overflow-y: auto; background: #111; border: 2px solid #0f0; padding: 5px; margin-top: 5px; }
         .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #111; border: 2px solid #0f0; padding: 10px; }
         @media (max-width: 600px) {
-            .console { width: 350px; height: 250px; }
-            .screen { width: 300px; height: 200px; }
-            .chessboard { width: 200px !important; height: 200px !important; }
+            .chessboard { width: 300px !important; height: 300px !important; }
+            .navbar { max-width: 350px; }
         }
     </style>
 </head>
 <body>
-    <div class="console">
+    <div class="container">
         <div class="navbar">
             <select id="difficulty">
                 <option>Easy</option>
@@ -149,24 +129,11 @@
             <button onclick="undoMove()" id="undoBtn" disabled>Undo</button>
             <button onclick="toggleAI()">AI: Minimax</button>
         </div>
-        <div class="screen">
+        <div class="console-frame">
             <div id="board" class="chessboard"></div>
             <div id="timer">White: 10:00 | Black: 10:00</div>
             <div id="status">White to Move (Drag to start clock)</div>
             <div id="history">Move History:<br></div>
-        </div>
-        <div class="controls-left">
-            <div class="dpad">
-                <div class="top"></div>
-                <div class="bottom"></div>
-                <div class="left"></div>
-                <div class="right"></div>
-                <div class="center"></div>
-            </div>
-        </div>
-        <div class="controls-right">
-            <div class="button a">A</div>
-            <div class="button b">B</div>
         </div>
         <div id="promotionModal" class="modal">
             <p>Promote Pawn To:</p>
@@ -253,7 +220,7 @@
                     onDragStart: onDragStart,
                     onDrop: onDrop,
                     onSnapEnd: onSnapEnd,
-                    pieceTheme: 'https://lichess1.org/assets/piece/cburnett/{piece}.svg', // Pixelated alternative; adjust if needed
+                    pieceTheme: 'https://lichess1.org/assets/piece/cburnett/{piece}.svg', // Pixelated alternative
                     moveSpeed: 100
                 });
                 updateStatus();
@@ -450,8 +417,8 @@
         function toggleTheme() {
             boardTheme = boardTheme === 'green' ? 'amber' : 'green';
             let color = boardTheme === 'green' ? '#0f0' : '#ffa500';
-            $('body, .screen, .button, button, select, input').css('border-color', color);
-            $('.screen, #history').css('background', color === '#0f0' ? '#000' : '#222');
+            $('body, .console-frame, .navbar, button, select, input').css('border-color', color);
+            $('.chessboard, #history').css('background', color === '#0f0' ? 'repeating-linear-gradient(45deg, #333, #333 10px, #555 10px, #555 20px)' : 'repeating-linear-gradient(45deg, #444, #444 10px, #666 10px, #666 20px)');
             initBoard();
         }
 
