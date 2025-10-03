@@ -1,44 +1,29 @@
 body {
-  background-color: #111;
-  color: #0ff;
-  font-family: 'Courier New', monospace;
-  text-align: center;
   margin: 0;
-  padding: 0;
+  background: radial-gradient(circle at center, #0f0f0f, #000000);
+  font-family: 'Press Start 2P', cursive;
+  color: #00ffff;
+  text-align: center;
 }
 
-.menu {
+#ui {
   padding: 1em;
-  background: #222;
-  border-bottom: 2px solid #0ff;
 }
 
-.board {
-  display: grid;
-  grid-template-columns: repeat(8, 50px);
-  grid-template-rows: repeat(8, 50px);
-  margin: 2em auto;
-  width: 400px;
+.controls {
+  margin-top: 1em;
+}
+
+select, button {
+  background: #111;
+  color: #0ff;
   border: 2px solid #0ff;
+  padding: 0.5em;
+  font-size: 1em;
 }
 
-.square {
-  width: 50px;
-  height: 50px;
-  font-size: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.light {
-  background-color: #ccc;
-}
-
-.dark {
-  background-color: #666;
-}
-
-.selected {
-  outline: 2px solid yellow;
+#board-container {
+  width: 100%;
+  height: 80vh;
+  margin-top: 1em;
 }
