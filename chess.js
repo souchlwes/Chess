@@ -15,20 +15,20 @@ function startGame() {
 function renderBoard() {
   const boardDiv = document.getElementById('board');
   boardDiv.innerHTML = '';
-  const board = game.board();
+  const squares = game.SQUARES;
   const flip = playerColor === 'black';
 
-  for (let y = 0; y < 8; y++) {
-    for (let x = 0; x < 8; x++) {
+  for (let rank = 8; rank >= 1; rank--) {
+    for (let file = 0; file < 8; file++) {
+      const fileChar = 'abcdefgh'[file];
+      const squareId = fileChar + rank;
       const square = document.createElement('div');
-      const file = flip ? 7 - x : x;
-      const rank = flip ? y : 7 - y;
-      const piece = board[rank][file];
+      const piece = game.get(squareId);
 
       square.className = `square ${(file + rank) % 2 === 0 ? 'light' : 'dark'}`;
-      square.dataset.square = `${'abcdefgh'[file]}${rank + 1}`;
+      square.dataset.square = squareId;
       square.textContent = piece ? (piece.color === 'w' ? piece.type.toUpperCase() : piece.type) : '';
-      square.onclick = () => handleClick(square.dataset.square);
+      square.onclick = () => handleClick(squareId);
       boardDiv.appendChild(square);
     }
   }
