@@ -6,15 +6,11 @@
     <title>Cyber Chess Console</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <!-- Fallback for Chessboard.js if CDN fails -->
-    <script>
-        if (!window.Chessboard) {
-            document.write('<script src="chessboard-1.0.0.min.js"><\/script>'); // Add local file if hosted
-        }
-    </script>
-    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css" onload="console.log('Chessboard CSS loaded')">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.0/chess.min.js" onload="console.log('Chess.js loaded')"></script>
-    <script src="https://cdn.jsdelivr.net/npm/stockfish@17.1.0/stockfish.js" onload="console.log('Stockfish loaded')"></script>
+    <!-- Local script files - update paths after hosting -->
+    <link rel="stylesheet" href="/scripts/chessboard-1.0.0.min.css">
+    <script src="/scripts/chessboard-1.0.0.min.js"></script>
+    <script src="/scripts/chess.min.js"></script>
+    <script src="/scripts/stockfish.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
@@ -23,7 +19,7 @@
             padding: 0;
             background: linear-gradient(to bottom, #000010, #001020);
             font-family: 'Press Start 2P', monospace;
-            color: #00ffff;
+            color: #00ffcc;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -34,54 +30,52 @@
 
         .gaming-console {
             position: relative;
-            width: 500px;
+            width: 400px;
             height: 600px;
-            background: linear-gradient(135deg, #1a1a1a, #0a0a0a);
-            border: 12px solid #333;
-            border-radius: 20px;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6), inset 0 0 30px #00ffff;
-            perspective: 1000px;
-            transform: rotateX(10deg) rotateY(5deg);
+            background: linear-gradient(135deg, #1c2529, #0a1014);
+            border: 10px solid #333;
+            border-radius: 25px;
+            box-shadow: 0 35px 70px rgba(0, 0, 0, 0.8), inset 0 0 50px #00ffcc;
+            perspective: 1500px;
+            transform: rotateX(20deg) rotateY(15deg);
             z-index: 1;
-            image-rendering: pixelated;
         }
 
         .gaming-console::before {
             content: 'CYBER CHESS';
             position: absolute;
-            top: 15px;
+            top: 25px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 16px;
-            color: #00ffff;
-            text-shadow: 0 0 12px #00ffff;
+            font-size: 20px;
+            color: #00ffcc;
+            text-shadow: 0 0 20px #00ffcc;
             text-transform: uppercase;
         }
 
         .gaming-console::after {
             content: '●';
             position: absolute;
-            top: 20px;
-            right: 25px;
-            color: #ff0000;
-            font-size: 22px;
-            text-shadow: 0 0 10px #ff0000;
+            top: 30px;
+            right: 35px;
+            color: #ff4444;
+            font-size: 26px;
+            text-shadow: 0 0 15px #ff4444;
             animation: blink 1s infinite;
         }
 
         .screen {
             position: absolute;
-            top: 80px;
-            left: 50px;
+            top: 100px;
+            left: 0;
             width: 400px;
             height: 400px;
-            background: linear-gradient(to top, #111, #000);
-            border: 10px solid #00ffff;
-            border-radius: 10px;
-            box-shadow: inset 0 0 20px #00ffff, 0 5px 15px rgba(0, 255, 255, 0.3);
-            transform: translateZ(30px);
+            background: linear-gradient(to top, #222222, #000000);
+            border: 15px solid #00ffcc;
+            border-radius: 15px;
+            box-shadow: inset 0 0 30px #00ffcc, 0 15px 25px rgba(0, 255, 204, 0.5);
+            transform: translateZ(50px);
             overflow: hidden;
-            image-rendering: pixelated;
         }
 
         #board {
@@ -94,55 +88,47 @@
 
         .controls {
             position: absolute;
-            bottom: 60px;
-            left: 60px;
+            bottom: 80px;
+            left: 50px;
             display: flex;
-            gap: 25px;
+            gap: 40px;
         }
 
         .button {
             width: 50px;
             height: 50px;
-            background: linear-gradient(45deg, #00ffff, #00ccff);
-            border: 4px solid #00ffff;
+            background: linear-gradient(45deg, #00ffcc, #00cc99);
+            border: 4px solid #00ffcc;
             border-radius: 50%;
             cursor: pointer;
-            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.4), inset 0 3px 5px #00ffff;
-            image-rendering: pixelated;
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.6), inset 0 5px 10px #00ffcc;
         }
 
-        .button:hover { background: linear-gradient(45deg, #00ccff, #0099ff); }
+        .button:hover { background: linear-gradient(45deg, #00cc99, #009966); }
 
-        .dpad {
+        .joystick {
             position: absolute;
-            bottom: 60px;
-            right: 60px;
-            width: 70px;
-            height: 70px;
+            bottom: 80px;
+            right: 50px;
+            width: 60px;
+            height: 60px;
             background: #333;
-            border: 4px solid #00ffff;
-            border-radius: 15px;
-            display: grid;
-            grid-template-areas:
-                "top    .    right"
-                "left   .    down"
-                "left   .    .   ";
-            gap: 5px;
-            padding: 5px;
-            image-rendering: pixelated;
+            border: 4px solid #00ffcc;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .dpad div {
-            background: linear-gradient(45deg, #00ffff, #00ccff);
-            border: 3px solid #00ffff;
-            cursor: pointer;
-            image-rendering: pixelated;
+        .joystick::before {
+            content: '';
+            width: 35px;
+            height: 35px;
+            background: linear-gradient(45deg, #00ffcc, #00cc99);
+            border: 3px solid #00ffcc;
+            border-radius: 50%;
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
         }
-
-        .dpad .top { grid-area: top; height: 100%; }
-        .dpad .right { grid-area: right; width: 100%; }
-        .dpad .down { grid-area: down; height: 100%; }
-        .dpad .left { grid-area: left; width: 100%; }
 
         .overlay-wires {
             position: absolute;
@@ -156,8 +142,8 @@
                 45deg,
                 transparent,
                 transparent 10px,
-                #00ffff11 10px,
-                #00ffff11 20px
+                #00ffcc22 10px,
+                #00ffcc22 20px
             );
             animation: pulseWires 4s infinite linear;
         }
@@ -174,19 +160,19 @@
 
         @media (max-width: 600px) {
             .gaming-console {
-                width: 350px;
-                height: 420px;
+                width: 300px;
+                height: 450px;
             }
             .screen {
-                top: 50px;
-                left: 25px;
+                top: 70px;
                 width: 300px;
                 height: 300px;
             }
-            .controls { bottom: 40px; left: 25px; }
-            .dpad { bottom: 40px; right: 25px; }
+            .controls { bottom: 60px; left: 20px; }
+            .joystick { bottom: 60px; right: 20px; }
             .button { width: 40px; height: 40px; }
-            .dpad { width: 60px; height: 60px; }
+            .joystick { width: 50px; height: 50px; }
+            .joystick::before { width: 25px; height: 25px; }
         }
 
         .navbar {
@@ -195,9 +181,9 @@
             flex-wrap: wrap;
             justify-content: center;
             background: #0a0a0a;
-            border: 4px solid #00ffff;
+            border: 4px solid #00ffcc;
             padding: 10px;
-            box-shadow: 0 0 15px #00ffff;
+            box-shadow: 0 0 15px #00ffcc;
             margin-bottom: 20px;
             width: 100%;
             max-width: 500px;
@@ -206,27 +192,26 @@
 
         button, select, input[type="number"] {
             padding: 8px 12px;
-            background: #00ffff;
+            background: #00ffcc;
             color: #000;
-            border: 2px solid #00ffff;
+            border: 2px solid #00ffcc;
             border-radius: 0;
             font-family: 'Press Start 2P', monospace;
             font-size: 12px;
             font-weight: bold;
-            image-rendering: pixelated;
         }
 
-        button:hover { background: #00ccff; }
+        button:hover { background: #00cc99; }
         button:disabled { background: #555; border-color: #555; color: #333; cursor: not-allowed; }
 
         #timer { 
             font-size: 12px; 
             text-align: center; 
             background: #0a0a0a; 
-            border: 2px solid #00ffff; 
+            border: 2px solid #00ffcc; 
             padding: 10px; 
             margin: 10px 0; 
-            box-shadow: 0 0 5px #00ffff; 
+            box-shadow: 0 0 5px #00ffcc; 
             width: 100%; 
             max-width: 500px; 
         }
@@ -235,17 +220,17 @@
             font-size: 12px; 
             text-align: center; 
             margin: 10px 0; 
-            text-shadow: 0 0 5px #00ffff; 
+            text-shadow: 0 0 5px #00ffcc; 
         }
 
         #history { 
             max-height: 100px; 
             overflow-y: auto; 
             background: #0a0a0a; 
-            border: 2px solid #00ffff; 
+            border: 2px solid #00ffcc; 
             padding: 10px; 
             margin-top: 10px; 
-            color: #00ffff; 
+            color: #00ffcc; 
             font-size: 10px; 
             width: 100%; 
             max-width: 500px; 
@@ -258,17 +243,17 @@
             left: 50%;
             transform: translate(-50%, -50%);
             background: #0a0a0a;
-            border: 3px solid #00ffff;
+            border: 3px solid #00ffcc;
             padding: 20px;
-            box-shadow: 0 0 15px #00ffff;
+            box-shadow: 0 0 15px #00ffcc;
             z-index: 1000;
-            color: #00ffff;
+            color: #00ffcc;
             font-family: 'Press Start 2P', monospace;
             font-size: 12px;
             font-weight: bold;
         }
 
-        .modal button { margin: 5px; background: #00ffff; color: #000; }
+        .modal button { margin: 5px; background: #00ffcc; color: #000; }
 
         .game-over-modal { text-align: center; }
         .game-over-modal textarea {
@@ -276,8 +261,8 @@
             height: 80px;
             margin-top: 10px;
             background: #000;
-            color: #00ffff;
-            border: 2px solid #00ffff;
+            color: #00ffcc;
+            border: 2px solid #00ffcc;
             font-family: 'Press Start 2P', monospace;
             font-size: 10px;
             resize: none;
@@ -322,13 +307,10 @@
         <div class="controls">
             <div class="button"></div>
             <div class="button"></div>
+            <div class="button"></div>
+            <div class="button"></div>
         </div>
-        <div class="dpad">
-            <div class="top"></div>
-            <div class="right"></div>
-            <div class="down"></div>
-            <div class="left"></div>
-        </div>
+        <div class="joystick"></div>
     </div>
     <div id="timer">White: 10:00 | Black: 10:00</div>
     <div id="status">Loading...</div>
@@ -374,7 +356,7 @@
         let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         let aiThinking = false;
         let victoryMusic = document.getElementById('victory-music');
-        let stockfish = new Worker('https://cdn.jsdelivr.net/npm/stockfish@17.1.0/stockfish.js');
+        let stockfish = new Worker('/scripts/stockfish.js'); // Update path
 
         stockfish.onmessage = function(event) {
             console.log('Stockfish:', event.data);
@@ -420,10 +402,8 @@
         }
 
         function initBoard() {
-            let attempts = 0;
-            const maxAttempts = 3;
-            function tryInit() {
-                try {
+            try {
+                setTimeout(() => {
                     if (window.Chessboard && !board) {
                         const config = {
                             draggable: true,
@@ -438,29 +418,17 @@
                         if (board) {
                             document.getElementById('status').innerHTML = 'White to Move (Drag to start clock)';
                             console.log('Board initialized successfully');
-                            return;
+                        } else {
+                            throw new Error('Chessboard object not created');
                         }
-                    }
-                    if (attempts < maxAttempts) {
-                        attempts++;
-                        console.log(`Attempt ${attempts} to initialize board failed, retrying...`);
-                        setTimeout(tryInit, 3000); // Retry after 3 seconds
                     } else {
-                        console.error('Max retries reached, board initialization failed');
-                        document.getElementById('status').innerHTML = 'Board failed to load. Check console or refresh.';
+                        throw new Error('Chessboard library not loaded');
                     }
-                } catch (e) {
-                    console.error('Board init error:', e);
-                    if (attempts < maxAttempts) {
-                        attempts++;
-                        console.log(`Error on attempt ${attempts}, retrying...`);
-                        setTimeout(tryInit, 3000);
-                    } else {
-                        document.getElementById('status').innerHTML = 'Board failed to load. Check console or refresh.';
-                    }
-                }
+                }, 5000); // 5-second delay for DOM readiness
+            } catch (e) {
+                console.error('Board init error:', e);
+                document.getElementById('status').innerHTML = 'Board failed to load. Check console, ensure local scripts are hosted, or refresh.';
             }
-            tryInit();
         }
 
         function onDragStart(source, piece) {
@@ -659,7 +627,7 @@
         });
 
         window.addEventListener('load', () => {
-            setTimeout(initBoard, 500);
+            initBoard();
             newGame();
         });
     </script>
