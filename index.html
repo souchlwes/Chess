@@ -68,38 +68,13 @@
         }
 
         #board {
-            width: 100%;
-            max-width: 500px;
-            aspect-ratio: 1 / 1;
+            width: 500px !important;
+            height: 500px !important;
             background: #000;
             border: 8px solid #00ffff;
             box-shadow: inset 0 0 20px #00ffff, 0 0 15px #00ffff;
             position: relative;
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            grid-template-rows: repeat(8, 1fr);
             z-index: 2;
-        }
-
-        .square {
-            width: 100%;
-            height: 100%;
-        }
-
-        .light {
-            background-color: #222;
-        }
-
-        .dark {
-            background-color: #00ffff22;
-        }
-
-        .piece {
-            font-size: 2em;
-            text-align: center;
-            line-height: 1;
-            color: #fff;
-            text-shadow: 0 0 5px #00ffff;
         }
 
         .overlay-wires {
@@ -127,7 +102,8 @@
 
         @media (max-width: 600px) {
             #board {
-                max-width: 350px;
+                width: 350px !important;
+                height: 350px !important;
             }
             .console-frame {
                 padding: 15px;
@@ -365,11 +341,12 @@
                     pieceTheme: `https://chessboardjs.com/img/chesspieces/${boardTheme === 'green' ? 'alpha' : 'merida'}/{piece}.png`
                 };
                 board = Chessboard('board', config);
+                if (!board) throw new Error('Chessboard initialization failed');
                 document.getElementById('status').innerHTML = 'White to Move (Drag to start clock)';
                 console.log('Board initialized successfully');
             } catch (e) {
-                console.error('Board init failed:', e);
-                document.getElementById('status').innerHTML = 'Board failed to load. Refresh page or check console.';
+                console.error('Board init error:', e);
+                document.getElementById('status').innerHTML = 'Board failed to load. Check console or refresh.';
             }
         }
 
