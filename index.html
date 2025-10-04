@@ -6,10 +6,15 @@
     <title>Cyber Chess Console</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
-    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.0/chess.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/stockfish@17.1.0/stockfish.js"></script>
+    <!-- Fallback for Chessboard.js if CDN fails -->
+    <script>
+        if (!window.Chessboard) {
+            document.write('<script src="chessboard-1.0.0.min.js"><\/script>'); // Add local file if hosted
+        }
+    </script>
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css" onload="console.log('Chessboard CSS loaded')">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.0/chess.min.js" onload="console.log('Chess.js loaded')"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stockfish@17.1.0/stockfish.js" onload="console.log('Stockfish loaded')"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
@@ -31,33 +36,36 @@
             position: relative;
             width: 500px;
             height: 600px;
-            background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
-            border: 10px solid #333;
+            background: linear-gradient(135deg, #1a1a1a, #0a0a0a);
+            border: 12px solid #333;
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), inset 0 0 20px #00ffff;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6), inset 0 0 30px #00ffff;
             perspective: 1000px;
+            transform: rotateX(10deg) rotateY(5deg);
             z-index: 1;
+            image-rendering: pixelated;
         }
 
         .gaming-console::before {
-            content: 'Cyber Chess';
+            content: 'CYBER CHESS';
             position: absolute;
-            top: 10px;
+            top: 15px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 14px;
+            font-size: 16px;
             color: #00ffff;
-            text-shadow: 0 0 10px #00ffff;
+            text-shadow: 0 0 12px #00ffff;
+            text-transform: uppercase;
         }
 
         .gaming-console::after {
             content: '●';
             position: absolute;
-            top: 15px;
-            right: 20px;
+            top: 20px;
+            right: 25px;
             color: #ff0000;
-            font-size: 20px;
-            text-shadow: 0 0 8px #ff0000;
+            font-size: 22px;
+            text-shadow: 0 0 10px #ff0000;
             animation: blink 1s infinite;
         }
 
@@ -67,11 +75,13 @@
             left: 50px;
             width: 400px;
             height: 400px;
-            background: #000;
-            border: 5px solid #00ffff;
-            box-shadow: inset 0 0 20px #00ffff;
-            transform: translateZ(20px);
+            background: linear-gradient(to top, #111, #000);
+            border: 10px solid #00ffff;
+            border-radius: 10px;
+            box-shadow: inset 0 0 20px #00ffff, 0 5px 15px rgba(0, 255, 255, 0.3);
+            transform: translateZ(30px);
             overflow: hidden;
+            image-rendering: pixelated;
         }
 
         #board {
@@ -84,33 +94,34 @@
 
         .controls {
             position: absolute;
-            bottom: 50px;
-            left: 50px;
+            bottom: 60px;
+            left: 60px;
             display: flex;
-            gap: 20px;
+            gap: 25px;
         }
 
         .button {
-            width: 40px;
-            height: 40px;
-            background: #00ffff;
-            border: 3px solid #00ffff;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(45deg, #00ffff, #00ccff);
+            border: 4px solid #00ffff;
             border-radius: 50%;
             cursor: pointer;
-            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.4), inset 0 3px 5px #00ffff;
+            image-rendering: pixelated;
         }
 
-        .button:hover { background: #00ccff; }
+        .button:hover { background: linear-gradient(45deg, #00ccff, #0099ff); }
 
         .dpad {
             position: absolute;
-            bottom: 50px;
-            right: 50px;
-            width: 60px;
-            height: 60px;
+            bottom: 60px;
+            right: 60px;
+            width: 70px;
+            height: 70px;
             background: #333;
-            border: 3px solid #00ffff;
-            border-radius: 10px;
+            border: 4px solid #00ffff;
+            border-radius: 15px;
             display: grid;
             grid-template-areas:
                 "top    .    right"
@@ -118,12 +129,14 @@
                 "left   .    .   ";
             gap: 5px;
             padding: 5px;
+            image-rendering: pixelated;
         }
 
         .dpad div {
-            background: #00ffff;
-            border: 2px solid #00ffff;
+            background: linear-gradient(45deg, #00ffff, #00ccff);
+            border: 3px solid #00ffff;
             cursor: pointer;
+            image-rendering: pixelated;
         }
 
         .dpad .top { grid-area: top; height: 100%; }
@@ -165,13 +178,15 @@
                 height: 420px;
             }
             .screen {
-                top: 60px;
+                top: 50px;
                 left: 25px;
                 width: 300px;
                 height: 300px;
             }
-            .controls { bottom: 30px; left: 25px; }
-            .dpad { bottom: 30px; right: 25px; }
+            .controls { bottom: 40px; left: 25px; }
+            .dpad { bottom: 40px; right: 25px; }
+            .button { width: 40px; height: 40px; }
+            .dpad { width: 60px; height: 60px; }
         }
 
         .navbar {
@@ -198,6 +213,7 @@
             font-family: 'Press Start 2P', monospace;
             font-size: 12px;
             font-weight: bold;
+            image-rendering: pixelated;
         }
 
         button:hover { background: #00ccff; }
@@ -403,29 +419,48 @@
             }
         }
 
-        function initBoard(retries = 3) {
-            try {
-                const config = {
-                    draggable: true,
-                    position: 'start',
-                    onDragStart: onDragStart,
-                    onDrop: onDrop,
-                    onSnapEnd: onSnapEnd,
-                    moveSpeed: 200,
-                    pieceTheme: `https://chessboardjs.com/img/chesspieces/${boardTheme === 'green' ? 'alpha' : 'merida'}/{piece}.png`
-                };
-                board = Chessboard('board', config);
-                if (!board) throw new Error('Chessboard initialization failed');
-                document.getElementById('status').innerHTML = 'White to Move (Drag to start clock)';
-                console.log('Board initialized successfully');
-            } catch (e) {
-                console.error('Board init error:', e, `Retries left: ${retries}`);
-                if (retries > 0) {
-                    setTimeout(() => initBoard(retries - 1), 1000);
-                } else {
-                    document.getElementById('status').innerHTML = 'Board failed to load. Check console or refresh.';
+        function initBoard() {
+            let attempts = 0;
+            const maxAttempts = 3;
+            function tryInit() {
+                try {
+                    if (window.Chessboard && !board) {
+                        const config = {
+                            draggable: true,
+                            position: 'start',
+                            onDragStart: onDragStart,
+                            onDrop: onDrop,
+                            onSnapEnd: onSnapEnd,
+                            moveSpeed: 200,
+                            pieceTheme: `https://chessboardjs.com/img/chesspieces/${boardTheme === 'green' ? 'alpha' : 'merida'}/{piece}.png`
+                        };
+                        board = Chessboard('board', config);
+                        if (board) {
+                            document.getElementById('status').innerHTML = 'White to Move (Drag to start clock)';
+                            console.log('Board initialized successfully');
+                            return;
+                        }
+                    }
+                    if (attempts < maxAttempts) {
+                        attempts++;
+                        console.log(`Attempt ${attempts} to initialize board failed, retrying...`);
+                        setTimeout(tryInit, 3000); // Retry after 3 seconds
+                    } else {
+                        console.error('Max retries reached, board initialization failed');
+                        document.getElementById('status').innerHTML = 'Board failed to load. Check console or refresh.';
+                    }
+                } catch (e) {
+                    console.error('Board init error:', e);
+                    if (attempts < maxAttempts) {
+                        attempts++;
+                        console.log(`Error on attempt ${attempts}, retrying...`);
+                        setTimeout(tryInit, 3000);
+                    } else {
+                        document.getElementById('status').innerHTML = 'Board failed to load. Check console or refresh.';
+                    }
                 }
             }
+            tryInit();
         }
 
         function onDragStart(source, piece) {
