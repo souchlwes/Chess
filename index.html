@@ -202,9 +202,7 @@
         <button onclick="copyPGN()">Copy PGN</button>
         <button onclick="closeGameOverModal()">Close</button>
     </div>
-    <div id="youtube-player">
-        <iframe id="yt-player" width="100%" height="100%" src="https://www.youtube.com/embed/dQ1vX9Y6dTA?autoplay=1&mute=1" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-    </div>
+    <div id="youtube-player"></div>
 
     <script>
         let game = new Chess();
@@ -224,6 +222,41 @@
         let boardTheme = 'green';
         let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         let aiThinking = false;
+        let ytPlayer = null;
+
+        function onYouTubeIframeAPIReady() {
+            ytPlayer = new YT.Player('youtube-player', {
+                height: '200',
+                width: '300',
+                videoId: 'dQ1vX9Y6dTA', // ABBA - The Winner Takes It All (official if embeddable)
+                playerVars: {
+                    'autoplay': 0,
+                    'mute': 1,
+                    'controls': 0,
+                    'loop': 0,
+                    'playlist': 'dQ1vX9Y6dTA'
+                },
+                events: {
+                    'onReady': onPlayerReady
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            console.log('YouTube player ready');
+        }
+
+        function playYouTube() {
+            if (ytPlayer && ytPlayer.playVideo) {
+                ytPlayer.setVolume(100);
+                ytPlayer.unMute();
+                ytPlayer.playVideo();
+                document.getElementById('youtube-player').style.display = 'block';
+            } else {
+                console.error('YouTube player not ready or unavailable');
+                alert('Failed to play victory music. Check console for details.');
+            }
+        }
 
         function playSound(frequency, duration) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -233,16 +266,6 @@
             oscillator.frequency.value = frequency;
             oscillator.start();
             setTimeout(() => oscillator.stop(), duration);
-        }
-
-        function playYouTube() {
-            let player = document.getElementById('yt-player');
-            if (player) {
-                player.src += '&mute=0'; // Unmute and replay
-                document.getElementById('youtube-player').style.display = 'block';
-            } else {
-                console.error('YouTube player not found');
-            }
         }
 
         function initBoard() {
@@ -306,36 +329,50 @@
             if (game.game_over()) return;
             aiThinking = true;
             document.getElementById('status').innerHTML = 'AI Thinking...';
-            let depth = difficulty === 0 ? 3 : difficulty === 1 ? 5 : 7;
-            let bestMove = getBestMove(depth);
-            if (bestMove) {
-                game.move(bestMove);
-                undoStack.push(bestMove);
-                updateHistory(bestMove);
-                board.position(game.fen());
-                playSound(200, 100);
-            }
-            aiThinking = false;
-            timerPaused = false;
-            updateStatus();
-        }
+            let depth = Math.min(difficulty === 0 ? 2 : difficulty === 1 ? 3 : 4, 4); // Cap at 4 to prevent freezing
+            let startTime = performance.now();
+            let bestMove = null;
 
-        function getBestMove(depth) {
-            let moves = game.moves({ verbose: true });
-            if (depth === 0 || moves.length === 0) return moves[Math.floor(Math.random() * moves.length)];
-            let best = null;
-            let bestValue = game.turn() === 'w' ? -Infinity : Infinity;
-            for (let move of moves) {
-                game.move(move);
-                let value = minimax(depth - 1, -Infinity, Infinity, game.turn() === 'w');
-                game.undo();
-                if ((game.turn() === 'w' && value > bestValue) || (game.turn() === 'b' && value < bestValue)) {
-                    bestValue = value;
-                    best = move;
-                }
+            function findMove(d) {
+                return new Promise(resolve => {
+                    let moves = game.moves({ verbose: true });
+                    if (d === 0 || moves.length === 0 || performance.now() - startTime > 5000) {
+                        resolve(moves[Math.floor(Math.random() * moves.length)]);
+                        return;
+                    }
+                    let best = null;
+                    let bestValue = game.turn() === 'w' ? -Infinity : Infinity;
+                    for (let move of moves) {
+                        game.move(move);
+                        let value = minimax(d - 1, -Infinity, Infinity, game.turn() === 'w');
+                        game.undo();
+                        if ((game.turn() === 'w' && value > bestValue) || (game.turn() === 'b' && value < bestValue)) {
+                            bestValue = value;
+                            best = move;
+                        }
+                    }
+                    if (best && game.in_check() && game.moves().length === 0) resolve(best);
+                    else resolve(best);
+                });
             }
-            if (best && game.in_check() && game.moves().length === 0) return best;
-            return best;
+
+            findMove(depth).then(move => {
+                if (move) {
+                    game.move(move);
+                    undoStack.push(move);
+                    updateHistory(move);
+                    board.position(game.fen());
+                    playSound(200, 100);
+                }
+                aiThinking = false;
+                timerPaused = false;
+                updateStatus();
+            }).catch(e => {
+                console.error('AI move failed:', e);
+                aiThinking = false;
+                timerPaused = false;
+                updateStatus();
+            });
         }
 
         function minimax(depth, alpha, beta, maximizing) {
@@ -444,6 +481,7 @@
             document.getElementById('undoBtn').disabled = true;
             if (timerInterval) clearInterval(timerInterval);
             updateTimer();
+            if (ytPlayer) ytPlayer.stopVideo();
             document.getElementById('youtube-player').style.display = 'none';
         }
 
@@ -485,6 +523,7 @@
         function closeGameOverModal() {
             document.getElementById('gameOverModal').style.display = 'none';
             document.getElementById('youtube-player').style.display = 'none';
+            if (ytPlayer) ytPlayer.stopVideo();
             newGame();
         }
 
@@ -518,6 +557,10 @@
         });
 
         window.addEventListener('load', () => {
+            const tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
             setTimeout(initBoard, 500);
             newGame();
         });
