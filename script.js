@@ -93,6 +93,8 @@ function getUnicode(piece) {
 }
 
 function handleClick(square) {
+  const piece = game.get(square);
+
   if (selectedSquare) {
     const move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
     if (move) {
@@ -100,12 +102,18 @@ function handleClick(square) {
       renderBoard();
       makeMove();
     } else {
-      selectedSquare = square;
+      if (piece && piece.color === game.turn()) {
+        selectedSquare = square;
+      } else {
+        selectedSquare = null;
+      }
       renderBoard();
     }
   } else {
-    selectedSquare = square;
-    renderBoard();
+    if (piece && piece.color === game.turn()) {
+      selectedSquare = square;
+      renderBoard();
+    }
   }
 }
 
