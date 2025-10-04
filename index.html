@@ -18,6 +18,17 @@
       <button onclick="startAI()">Play vs AI</button>
       <button onclick="startMultiplayer()">Multiplayer</button>
       <button onclick="resetGame()">Reset</button>
+      <button onclick="toggleStyle()">Toggle Style</button>
+    </div>
+
+    <div class="history">
+      <h3>Move History</h3>
+      <ul id="moveList"></ul>
+    </div>
+
+    <div class="leaderboard">
+      <h3>Leaderboard</h3>
+      <p>Wins vs AI: <span id="winCount">0</span></p>
     </div>
 
     <audio id="mateSound" src="https://www.dropbox.com/scl/fi/o1pzso0aav78g26pqe0br/The-loser-has-to-fall.mp3?rlkey=fxczjyqevgcy2h4qqyw7d2050&st=qqg46ha3&raw=1"></audio>
