@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Retro Console Chess</title>
+    <title>Cyber Chess Console</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
@@ -27,55 +27,109 @@
             overflow: hidden;
         }
 
-        .console-frame {
-            background: radial-gradient(circle at center, #0a0a0a 0%, #1a1a1a 100%);
-            border: 12px solid #00ffff;
-            border-radius: 20px;
-            padding: 25px;
-            box-shadow: 0 0 30px #00ffff, inset 0 0 15px #00ffff;
+        .gaming-console {
             position: relative;
-            width: fit-content;
-            align-self: center;
+            width: 500px;
+            height: 600px;
+            background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
+            border: 10px solid #333;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), inset 0 0 20px #00ffff;
+            perspective: 1000px;
             z-index: 1;
         }
 
-        .console-frame::before {
-            content: 'Cyber Chess Console';
+        .gaming-console::before {
+            content: 'Cyber Chess';
             position: absolute;
-            top: -30px;
+            top: 10px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 12px;
-            font-weight: bold;
+            font-size: 14px;
             color: #00ffff;
-            text-shadow: 0 0 8px #00ffff;
+            text-shadow: 0 0 10px #00ffff;
         }
 
-        .console-frame::after {
+        .gaming-console::after {
             content: '●';
             position: absolute;
-            top: -25px;
+            top: 15px;
             right: 20px;
             color: #ff0000;
-            font-size: 18px;
-            text-shadow: 0 0 6px #ff0000;
+            font-size: 20px;
+            text-shadow: 0 0 8px #ff0000;
             animation: blink 1s infinite;
         }
 
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0; }
+        .screen {
+            position: absolute;
+            top: 80px;
+            left: 50px;
+            width: 400px;
+            height: 400px;
+            background: #000;
+            border: 5px solid #00ffff;
+            box-shadow: inset 0 0 20px #00ffff;
+            transform: translateZ(20px);
+            overflow: hidden;
         }
 
         #board {
-            width: 500px !important;
-            height: 500px !important;
-            background: #000;
-            border: 8px solid #00ffff;
-            box-shadow: inset 0 0 20px #00ffff, 0 0 15px #00ffff;
-            position: relative;
-            z-index: 2;
+            width: 100% !important;
+            height: 100% !important;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
+
+        .controls {
+            position: absolute;
+            bottom: 50px;
+            left: 50px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .button {
+            width: 40px;
+            height: 40px;
+            background: #00ffff;
+            border: 3px solid #00ffff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .button:hover { background: #00ccff; }
+
+        .dpad {
+            position: absolute;
+            bottom: 50px;
+            right: 50px;
+            width: 60px;
+            height: 60px;
+            background: #333;
+            border: 3px solid #00ffff;
+            border-radius: 10px;
+            display: grid;
+            grid-template-areas:
+                "top    .    right"
+                "left   .    down"
+                "left   .    .   ";
+            gap: 5px;
+            padding: 5px;
+        }
+
+        .dpad div {
+            background: #00ffff;
+            border: 2px solid #00ffff;
+            cursor: pointer;
+        }
+
+        .dpad .top { grid-area: top; height: 100%; }
+        .dpad .right { grid-area: right; width: 100%; }
+        .dpad .down { grid-area: down; height: 100%; }
+        .dpad .left { grid-area: left; width: 100%; }
 
         .overlay-wires {
             position: absolute;
@@ -100,14 +154,24 @@
             100% { background-position: 100px 100px; }
         }
 
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
         @media (max-width: 600px) {
-            #board {
-                width: 350px !important;
-                height: 350px !important;
+            .gaming-console {
+                width: 350px;
+                height: 420px;
             }
-            .console-frame {
-                padding: 15px;
+            .screen {
+                top: 60px;
+                left: 25px;
+                width: 300px;
+                height: 300px;
             }
+            .controls { bottom: 30px; left: 25px; }
+            .dpad { bottom: 30px; right: 25px; }
         }
 
         .navbar {
@@ -121,7 +185,7 @@
             box-shadow: 0 0 15px #00ffff;
             margin-bottom: 20px;
             width: 100%;
-            max-width: 600px;
+            max-width: 500px;
             z-index: 10;
         }
 
@@ -235,14 +299,24 @@
         <button onclick="newGame()">New Game</button>
         <button onclick="undoMove()" id="undoBtn" disabled>Undo</button>
     </div>
-    <div class="container">
-        <div id="timer">White: 10:00 | Black: 10:00</div>
-        <div class="console-frame">
+    <div class="gaming-console">
+        <div class="screen">
             <div id="board"></div>
         </div>
-        <div id="status">Loading...</div>
-        <div id="history">Move History:<br></div>
+        <div class="controls">
+            <div class="button"></div>
+            <div class="button"></div>
+        </div>
+        <div class="dpad">
+            <div class="top"></div>
+            <div class="right"></div>
+            <div class="down"></div>
+            <div class="left"></div>
+        </div>
     </div>
+    <div id="timer">White: 10:00 | Black: 10:00</div>
+    <div id="status">Loading...</div>
+    <div id="history">Move History:<br></div>
     <div id="promotionModal" class="modal">
         <p>Promote Pawn To:</p>
         <button onclick="promote('q')">Queen</button>
@@ -314,7 +388,7 @@
                 console.log('Timer paused:', timerPaused, 'Game started:', gameStarted);
                 return;
             }
-            if (currentTurn === 'w' && !timerPaused) whiteTime -= 1 / 600; // 1s per 600 frames (~0.00167s/frame)
+            if (currentTurn === 'w' && !timerPaused) whiteTime -= 1 / 600;
             else if (currentTurn === 'b' && !timerPaused) blackTime -= 1 / 600;
             let wMin = Math.floor(whiteTime / 60), wSec = Math.floor(whiteTime % 60);
             let bMin = Math.floor(blackTime / 60), bSec = Math.floor(blackTime % 60);
@@ -329,7 +403,7 @@
             }
         }
 
-        function initBoard() {
+        function initBoard(retries = 3) {
             try {
                 const config = {
                     draggable: true,
@@ -345,8 +419,12 @@
                 document.getElementById('status').innerHTML = 'White to Move (Drag to start clock)';
                 console.log('Board initialized successfully');
             } catch (e) {
-                console.error('Board init error:', e);
-                document.getElementById('status').innerHTML = 'Board failed to load. Check console or refresh.';
+                console.error('Board init error:', e, `Retries left: ${retries}`);
+                if (retries > 0) {
+                    setTimeout(() => initBoard(retries - 1), 1000);
+                } else {
+                    document.getElementById('status').innerHTML = 'Board failed to load. Check console or refresh.';
+                }
             }
         }
 
@@ -392,7 +470,7 @@
             aiThinking = true;
             document.getElementById('status').innerHTML = 'AI Thinking...';
             timerPaused = true;
-            let depth = { 0: 6, 1: 12, 2: 18 }[difficulty] || 6; // Easy: 6, Medium: 12, Hard: 18
+            let depth = { 0: 6, 1: 12, 2: 18 }[difficulty] || 6;
             stockfish.postMessage('ucinewgame');
             stockfish.postMessage(`position fen ${game.fen()}`);
             stockfish.postMessage(`go depth ${depth}`);
