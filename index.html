@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device=device-width, initial-scale=1.0">
     <title>Retro Console Chess</title>
     <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -139,17 +139,13 @@
             font-size: 16px;
             resize: none;
         }
-        #youtube-player {
+        #music-player {
             display: none;
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 300px;
-            height: 200px;
             z-index: 2000;
-            border: 3px solid #0f0;
-            box-shadow: 0 0 15px #0f0;
         }
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
@@ -161,7 +157,6 @@
             .navbar { max-width: 350px; gap: 10px; }
             .console-frame { padding: 15px; }
             #timer, #history { max-width: 350px; }
-            #youtube-player { width: 200px; height: 150px; }
         }
     </style>
 </head>
@@ -202,7 +197,12 @@
         <button onclick="copyPGN()">Copy PGN</button>
         <button onclick="closeGameOverModal()">Close</button>
     </div>
-    <div id="youtube-player"></div>
+    <div id="music-player">
+        <audio id="victory-music" preload="auto" loop>
+            <source src="https://www.dropbox.com/scl/fi/o1pzso0aav78g26pqe0br/The-loser-has-to-fall.mp3?rlkey=fxczjyqevgcy2h4qqyw7d2050&st=48ug8b9t&dl=1" type="audio/mp3">
+            Your browser does not support the audio element.
+        </audio>
+    </div>
 
     <script>
         let game = new Chess();
@@ -222,41 +222,7 @@
         let boardTheme = 'green';
         let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         let aiThinking = false;
-        let ytPlayer = null;
-
-        function onYouTubeIframeAPIReady() {
-            ytPlayer = new YT.Player('youtube-player', {
-                height: '200',
-                width: '300',
-                videoId: 'dQ1vX9Y6dTA', // ABBA - The Winner Takes It All (official if embeddable)
-                playerVars: {
-                    'autoplay': 0,
-                    'mute': 1,
-                    'controls': 0,
-                    'loop': 0,
-                    'playlist': 'dQ1vX9Y6dTA'
-                },
-                events: {
-                    'onReady': onPlayerReady
-                }
-            });
-        }
-
-        function onPlayerReady(event) {
-            console.log('YouTube player ready');
-        }
-
-        function playYouTube() {
-            if (ytPlayer && ytPlayer.playVideo) {
-                ytPlayer.setVolume(100);
-                ytPlayer.unMute();
-                ytPlayer.playVideo();
-                document.getElementById('youtube-player').style.display = 'block';
-            } else {
-                console.error('YouTube player not ready or unavailable');
-                alert('Failed to play victory music. Check console for details.');
-            }
-        }
+        let victoryMusic = document.getElementById('victory-music');
 
         function playSound(frequency, duration) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -266,6 +232,15 @@
             oscillator.frequency.value = frequency;
             oscillator.start();
             setTimeout(() => oscillator.stop(), duration);
+        }
+
+        function playVictoryMusic() {
+            if (victoryMusic) {
+                victoryMusic.currentTime = 0; // Restart from beginning
+                victoryMusic.play().catch(e => console.error('Music play failed:', e));
+            } else {
+                console.error('Victory music element not found');
+            }
         }
 
         function initBoard() {
@@ -329,15 +304,15 @@
             if (game.game_over()) return;
             aiThinking = true;
             document.getElementById('status').innerHTML = 'AI Thinking...';
-            let depth = Math.min(difficulty === 0 ? 2 : difficulty === 1 ? 3 : 4, 4); // Cap at 4 to prevent freezing
+            let depth = Math.min(difficulty === 0 ? 2 : difficulty === 1 ? 3 : 4, 4); // Cap at 4
             let startTime = performance.now();
             let bestMove = null;
 
             function findMove(d) {
                 return new Promise(resolve => {
                     let moves = game.moves({ verbose: true });
-                    if (d === 0 || moves.length === 0 || performance.now() - startTime > 5000) {
-                        resolve(moves[Math.floor(Math.random() * moves.length)]);
+                    if (d === 0 || moves.length === 0 || performance.now() - startTime > 3000) {
+                        resolve(moves[Math.floor(Math.random() * moves.length)] || null);
                         return;
                     }
                     let best = null;
@@ -412,11 +387,11 @@
                 for (let piece of row.replace(/\d/g, '')) total += pieceValues[piece] || 0;
             }
             if (countPieces() < 6) {
-                let kingW = game.get('K').square;
-                let kingB = game.get('k').square;
+                let kingW = game.get('K')?.square;
+                let kingB = game.get('k')?.square;
                 let center = ['d4', 'e4', 'd5', 'e5'];
-                total += center.includes(kingW) ? 50 : 0;
-                total -= center.includes(kingB) ? 50 : 0;
+                total += kingW && center.includes(kingW) ? 50 : 0;
+                total -= kingB && center.includes(kingB) ? 50 : 0;
             }
             return total + (game.turn() === 'w' ? 10 : -10);
         }
@@ -481,8 +456,11 @@
             document.getElementById('undoBtn').disabled = true;
             if (timerInterval) clearInterval(timerInterval);
             updateTimer();
-            if (ytPlayer) ytPlayer.stopVideo();
-            document.getElementById('youtube-player').style.display = 'none';
+            if (victoryMusic) {
+                victoryMusic.pause();
+                victoryMusic.currentTime = 0;
+                document.getElementById('music-player').style.display = 'none';
+            }
         }
 
         function undoMove() {
@@ -517,13 +495,17 @@
             document.getElementById('moveCount').innerHTML = Math.ceil(moveHistory.length / 2);
             document.getElementById('pgnOutput').value = game.pgn();
             document.getElementById('gameOverModal').style.display = 'block';
-            playYouTube();
+            playVictoryMusic();
+            document.getElementById('music-player').style.display = 'block';
         }
 
         function closeGameOverModal() {
             document.getElementById('gameOverModal').style.display = 'none';
-            document.getElementById('youtube-player').style.display = 'none';
-            if (ytPlayer) ytPlayer.stopVideo();
+            if (victoryMusic) {
+                victoryMusic.pause();
+                victoryMusic.currentTime = 0;
+                document.getElementById('music-player').style.display = 'none';
+            }
             newGame();
         }
 
@@ -557,10 +539,6 @@
         });
 
         window.addEventListener('load', () => {
-            const tag = document.createElement('script');
-            tag.src = 'https://www.youtube.com/iframe_api';
-            const firstScriptTag = document.getElementsByTagName('script')[0];
-            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
             setTimeout(initBoard, 500);
             newGame();
         });
