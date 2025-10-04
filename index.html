@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Retro Console Chess</title>
     <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
     <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.0/chess.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stockfish@17.1.0/stockfish.js"></script>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -212,7 +213,7 @@
         let timeControl = 600;
         let whiteTime = timeControl;
         let blackTime = timeControl;
-        let timerInterval = null;
+        let timerFrame = null;
         let timerPaused = true;
         let gameStarted = false;
         let currentTurn = 'w';
@@ -223,6 +224,11 @@
         let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         let aiThinking = false;
         let victoryMusic = document.getElementById('victory-music');
+        let stockfish = new Worker('https://cdn.jsdelivr.net/npm/stockfish@17.1.0/stockfish.js');
+
+        stockfish.onmessage = function(event) {
+            console.log('Stockfish:', event.data);
+        };
 
         function playSound(frequency, duration) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -236,10 +242,30 @@
 
         function playVictoryMusic() {
             if (victoryMusic) {
-                victoryMusic.currentTime = 0; // Restart from beginning
+                victoryMusic.currentTime = 0;
                 victoryMusic.play().catch(e => console.error('Music play failed:', e));
             } else {
                 console.error('Victory music element not found');
+            }
+        }
+
+        function updateTimer() {
+            if (timerPaused || !gameStarted) {
+                console.log('Timer paused:', timerPaused, 'Game started:', gameStarted);
+                return;
+            }
+            if (currentTurn === 'w' && !timerPaused) whiteTime -= 1 / 600; // 1s per 600 frames (~0.00167s/frame)
+            else if (currentTurn === 'b' && !timerPaused) blackTime -= 1 / 600;
+            let wMin = Math.floor(whiteTime / 60), wSec = Math.floor(whiteTime % 60);
+            let bMin = Math.floor(blackTime / 60), bSec = Math.floor(blackTime % 60);
+            document.getElementById('timer').innerHTML = `White: ${wMin}:${wSec.toString().padStart(2,'0')} | Black: ${bMin}:${bSec.toString().padStart(2,'0')}`;
+            console.log('Timer updated - White:', whiteTime, 'Black:', blackTime);
+            if (whiteTime <= 0 || blackTime <= 0) {
+                cancelAnimationFrame(timerFrame);
+                let result = `${whiteTime <= 0 ? 'Black' : 'White'} Wins on Time!`;
+                showGameOverModal(result);
+            } else {
+                timerFrame = requestAnimationFrame(updateTimer);
             }
         }
 
@@ -272,8 +298,8 @@
             if (!gameStarted) {
                 gameStarted = true;
                 timerPaused = false;
-                if (!timerInterval) timerInterval = setInterval(updateTimer, 100);
-                updateTimer();
+                if (!timerFrame) timerFrame = requestAnimationFrame(updateTimer);
+                console.log('Game started, timer initiated');
             }
             let tempMove = game.move({ from: source, to: target });
             if (tempMove === null) {
@@ -291,7 +317,7 @@
             updateHistory(tempMove);
             updateStatus();
             playSound(tempMove.captured ? 150 : 300, 100);
-            timerPaused = true;
+            timerPaused = aiThinking;
             if (game.turn() === aiColor && !game.game_over()) setTimeout(makeAIMove, 500);
             else timerPaused = false;
         }
@@ -304,101 +330,29 @@
             if (game.game_over()) return;
             aiThinking = true;
             document.getElementById('status').innerHTML = 'AI Thinking...';
-            let depth = Math.min(difficulty === 0 ? 2 : difficulty === 1 ? 3 : 4, 4); // Cap at 4
-            let startTime = performance.now();
-            let bestMove = null;
+            timerPaused = true;
+            let depth = { 0: 6, 1: 12, 2: 18 }[difficulty] || 6; // Easy: 6, Medium: 12, Hard: 18
+            stockfish.postMessage('ucinewgame');
+            stockfish.postMessage(`position fen ${game.fen()}`);
+            stockfish.postMessage(`go depth ${depth}`);
 
-            function findMove(d) {
-                return new Promise(resolve => {
-                    let moves = game.moves({ verbose: true });
-                    if (d === 0 || moves.length === 0 || performance.now() - startTime > 3000) {
-                        resolve(moves[Math.floor(Math.random() * moves.length)] || null);
-                        return;
+            stockfish.onmessage = function(event) {
+                let message = event.data;
+                if (message.includes('bestmove')) {
+                    let match = message.match(/bestmove (\w+)/);
+                    if (match) {
+                        let bestMove = match[1];
+                        game.move(bestMove);
+                        undoStack.push({ san: game.history({ verbose: true }).pop().san, from: bestMove.substr(0, 2), to: bestMove.substr(2, 2) });
+                        updateHistory({ san: game.history({ verbose: true }).pop().san });
+                        board.position(game.fen());
+                        playSound(200, 100);
+                        aiThinking = false;
+                        timerPaused = false;
+                        updateStatus();
                     }
-                    let best = null;
-                    let bestValue = game.turn() === 'w' ? -Infinity : Infinity;
-                    for (let move of moves) {
-                        game.move(move);
-                        let value = minimax(d - 1, -Infinity, Infinity, game.turn() === 'w');
-                        game.undo();
-                        if ((game.turn() === 'w' && value > bestValue) || (game.turn() === 'b' && value < bestValue)) {
-                            bestValue = value;
-                            best = move;
-                        }
-                    }
-                    if (best && game.in_check() && game.moves().length === 0) resolve(best);
-                    else resolve(best);
-                });
-            }
-
-            findMove(depth).then(move => {
-                if (move) {
-                    game.move(move);
-                    undoStack.push(move);
-                    updateHistory(move);
-                    board.position(game.fen());
-                    playSound(200, 100);
                 }
-                aiThinking = false;
-                timerPaused = false;
-                updateStatus();
-            }).catch(e => {
-                console.error('AI move failed:', e);
-                aiThinking = false;
-                timerPaused = false;
-                updateStatus();
-            });
-        }
-
-        function minimax(depth, alpha, beta, maximizing) {
-            if (depth === 0 || game.game_over()) return evaluateBoard();
-            let moves = game.moves({ verbose: true });
-            if (maximizing) {
-                let maxEval = -Infinity;
-                for (let move of moves) {
-                    game.move(move);
-                    let eval = minimax(depth - 1, alpha, beta, false);
-                    game.undo();
-                    maxEval = Math.max(maxEval, eval);
-                    alpha = Math.max(alpha, eval);
-                    if (beta <= alpha) break;
-                }
-                return maxEval;
-            } else {
-                let minEval = Infinity;
-                for (let move of moves) {
-                    game.move(move);
-                    let eval = minimax(depth - 1, alpha, beta, true);
-                    game.undo();
-                    minEval = Math.min(minEval, eval);
-                    beta = Math.min(beta, eval);
-                    if (beta <= alpha) break;
-                }
-                return minEval;
-            }
-        }
-
-        function evaluateBoard() {
-            if (game.in_checkmate()) return game.turn() === 'w' ? -100000 : 100000;
-            let total = 0;
-            let fen = game.fen().split(' ')[0];
-            let pieceValues = { p: -1, n: -3, b: -3, r: -5, q: -9, k: 0, P: 1, N: 3, B: 3, R: 5, Q: 9, K: 0 };
-            for (let row of fen.split('/')) {
-                for (let piece of row.replace(/\d/g, '')) total += pieceValues[piece] || 0;
-            }
-            if (countPieces() < 6) {
-                let kingW = game.get('K')?.square;
-                let kingB = game.get('k')?.square;
-                let center = ['d4', 'e4', 'd5', 'e5'];
-                total += kingW && center.includes(kingW) ? 50 : 0;
-                total -= kingB && center.includes(kingB) ? 50 : 0;
-            }
-            return total + (game.turn() === 'w' ? 10 : -10);
-        }
-
-        function countPieces() {
-            let fen = game.fen().split(' ')[0];
-            return fen.replace(/[0-8]/g, '').length;
+            };
         }
 
         function updateHistory(move) {
@@ -427,20 +381,6 @@
             document.getElementById('undoBtn').disabled = undoStack.length === 0 || moveHistory.length % 2 === 0;
         }
 
-        function updateTimer() {
-            if (timerPaused || !gameStarted) return;
-            if (currentTurn === 'w') whiteTime -= 0.1;
-            else blackTime -= 0.1;
-            let wMin = Math.floor(whiteTime / 60), wSec = Math.floor(whiteTime % 60);
-            let bMin = Math.floor(blackTime / 60), bSec = Math.floor(blackTime % 60);
-            document.getElementById('timer').innerHTML = `White: ${wMin}:${wSec.toString().padStart(2,'0')} | Black: ${bMin}:${bSec.toString().padStart(2,'0')}`;
-            if (whiteTime <= 0 || blackTime <= 0) {
-                clearInterval(timerInterval);
-                let result = `${whiteTime <= 0 ? 'Black' : 'White'} Wins on Time!`;
-                showGameOverModal(result);
-            }
-        }
-
         function newGame() {
             game.reset();
             if (board) board.start();
@@ -454,13 +394,17 @@
             document.getElementById('history').innerHTML = 'Move History:<br>';
             document.getElementById('status').innerHTML = 'White to Move (Drag to start clock)';
             document.getElementById('undoBtn').disabled = true;
-            if (timerInterval) clearInterval(timerInterval);
+            if (timerFrame) {
+                cancelAnimationFrame(timerFrame);
+                timerFrame = null;
+            }
             updateTimer();
             if (victoryMusic) {
                 victoryMusic.pause();
                 victoryMusic.currentTime = 0;
                 document.getElementById('music-player').style.display = 'none';
             }
+            stockfish.postMessage('ucinewgame');
         }
 
         function undoMove() {
@@ -473,6 +417,7 @@
             updateStatus();
             playSound(200, 100);
             document.getElementById('undoBtn').disabled = undoStack.length === 0;
+            stockfish.postMessage(`position fen ${game.fen()}`);
         }
 
         function promote(piece) {
@@ -487,10 +432,11 @@
             updateStatus();
             if (game.turn() === aiColor && !game.game_over()) setTimeout(makeAIMove, 500);
             else timerPaused = false;
+            stockfish.postMessage(`position fen ${game.fen()}`);
         }
 
         function showGameOverModal(result) {
-            clearInterval(timerInterval);
+            cancelAnimationFrame(timerFrame);
             document.getElementById('gameResult').innerHTML = result;
             document.getElementById('moveCount').innerHTML = Math.ceil(moveHistory.length / 2);
             document.getElementById('pgnOutput').value = game.pgn();
