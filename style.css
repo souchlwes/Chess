@@ -2,12 +2,10 @@ body {
   background: #c0c0c0;
   font-family: 'Chicago', sans-serif;
   color: black;
-  margin: 0;
-  padding: 0;
 }
 
 .window {
-  max-width: 700px;
+  width: 640px;
   margin: 20px auto;
   background: white;
   border: 2px solid #333;
@@ -25,7 +23,6 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
   margin-top: 10px;
 }
 
@@ -68,10 +65,6 @@ body {
   background-color: #999;
 }
 
-.square:hover {
-  outline: 2px dashed #333;
-}
-
 .selected {
   outline: 2px solid #000;
   background-color: #ff0 !important;
@@ -87,24 +80,6 @@ button {
   background: #ddd;
   border: 1px solid #333;
   padding: 5px 10px;
-  margin: 5px;
+  margin: 0 5px;
   cursor: pointer;
-}
-
-button:hover {
-  background: #bbb;
-}
-
-.history, .leaderboard {
-  margin-top: 15px;
-  font-size: 14px;
-}
-
-.history ul {
-  list-style: none;
-  padding-left: 0;
-}
-
-.history li {
-  margin-bottom: 2px;
 }
