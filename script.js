@@ -4,9 +4,6 @@ let playerTime = 300;
 let aiTime = 300;
 let timerInterval;
 let selectedSquare = null;
-let pieceStyle = "unicode"; // or "emoji"
-let winCount = parseInt(localStorage.getItem("winCount")) || 0;
-document.getElementById("winCount").textContent = winCount;
 
 function updateTimers() {
   document.getElementById("player-timer").textContent = formatTime(playerTime);
@@ -40,12 +37,6 @@ function makeMove() {
     if (game.in_checkmate()) {
       document.getElementById("mateSound").play();
       alert("Checkmate! The loser has to fall.");
-      winCount++;
-      localStorage.setItem("winCount", winCount);
-      document.getElementById("winCount").textContent = winCount;
-    } else if (game.in_stalemate()) {
-      document.getElementById("crashSound").play();
-      alert("System Crash! Game ended in stalemate.");
     }
     return;
   }
@@ -78,7 +69,7 @@ function renderBoard() {
 
       const piece = squares[row][col];
       if (piece) {
-        squareEl.textContent = getSymbol(piece);
+        squareEl.textContent = getUnicode(piece);
       }
 
       const squareName = "abcdefgh"[col] + (row + 1);
@@ -91,26 +82,17 @@ function renderBoard() {
       boardEl.appendChild(squareEl);
     }
   }
-
-  renderHistory();
 }
 
-function getSymbol(piece) {
-  const unicode = {
+function getUnicode(piece) {
+  const symbols = {
     p: "♟", r: "♜", n: "♞", b: "♝", q: "♛", k: "♚",
     P: "♙", R: "♖", N: "♘", B: "♗", Q: "♕", K: "♔"
   };
-  const emoji = {
-    p: "🖤", r: "🏰", n: "🐴", b: "🧙", q: "👑", k: "💀",
-    P: "🤍", R: "🏯", N: "🦄", B: "🧝", Q: "👸", K: "😇"
-  };
-  const set = pieceStyle === "emoji" ? emoji : unicode;
-  return set[piece.color === "w" ? piece.type.toUpperCase() : piece.type] || "";
+  return symbols[piece.color === "w" ? piece.type.toUpperCase() : piece.type] || "";
 }
 
 function handleClick(square) {
-  document.getElementById("clickSound").play();
-
   if (selectedSquare) {
     const move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
     if (move) {
@@ -125,27 +107,6 @@ function handleClick(square) {
     selectedSquare = square;
     renderBoard();
   }
-}
-
-function renderHistory() {
-  const historyEl = document.getElementById("moveList");
-  const history = game.history();
-  historyEl.innerHTML = "";
-  history.forEach((move, i) => {
-    const li = document.createElement("li");
-    li.textContent = `${Math.floor(i / 2) + 1}. ${move}`;
-    historyEl.appendChild(li);
-  });
-}
-
-function toggleStyle() {
-  pieceStyle = pieceStyle === "unicode" ? "emoji" : "unicode";
-  renderBoard();
-}
-
-function startMultiplayer() {
-  clearInterval(timerInterval);
-  alert("Multiplayer mode coming soon!");
 }
 
 function resetGame() {
