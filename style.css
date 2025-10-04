@@ -2,10 +2,12 @@ body {
   background: #c0c0c0;
   font-family: 'Chicago', sans-serif;
   color: black;
+  margin: 0;
+  padding: 0;
 }
 
 .window {
-  width: 640px;
+  max-width: 700px;
   margin: 20px auto;
   background: white;
   border: 2px solid #333;
@@ -23,6 +25,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   margin-top: 10px;
 }
 
@@ -84,7 +87,7 @@ button {
   background: #ddd;
   border: 1px solid #333;
   padding: 5px 10px;
-  margin: 0 5px;
+  margin: 5px;
   cursor: pointer;
 }
 
@@ -92,13 +95,16 @@ button:hover {
   background: #bbb;
 }
 
-.alert {
-  background: #fff;
-  border: 2px solid #333;
-  padding: 10px;
-  font-size: 16px;
-  font-family: 'Chicago', sans-serif;
-  width: 300px;
-  margin: 20px auto;
-  text-align: center;
+.history, .leaderboard {
+  margin-top: 15px;
+  font-size: 14px;
+}
+
+.history ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.history li {
+  margin-bottom: 2px;
 }
