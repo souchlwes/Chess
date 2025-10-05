@@ -15,6 +15,7 @@
       align-items: center;
       height: 100vh;
       margin: 0;
+      position: relative;
     }
     .console { perspective: 1000px; }
     .shell {
@@ -79,15 +80,15 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 30px; /* Larger for visibility */
+      font-size: 30px; /* Large for visibility */
       cursor: pointer;
       user-select: none;
-      text-shadow: 0 0 4px #000, 0 0 4px #000; /* Maximum contrast */
+      text-shadow: 0 0 5px #000, 0 0 5px #000; /* Enhanced contrast */
       color: #fff; /* White pieces */
     }
     .square.black-piece { color: #000; } /* Black pieces */
-    .square.light { background: #fff8e1; } /* Brightest beige */
-    .square.dark { background: #6b4e31; } /* Darkest brown */
+    .square.light { background: #fff8e1; } /* Bright beige */
+    .square.dark { background: #6b4e31; } /* Dark brown */
     .square.selected { background: #ffeb3b !important; }
     .square.valid { background: #4caf50 !important; }
     .info {
@@ -137,6 +138,28 @@
       transform: translateY(2px);
     }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .computer-tab {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 300px;
+      height: 150px;
+      background: linear-gradient(to bottom, #2a5fb8, #1c3f7a);
+      border: 4px solid #0f0;
+      border-radius: 10px;
+      box-shadow: 0 0 15px #0f0;
+      color: #0f0;
+      text-align: center;
+      padding: 20px;
+      z-index: 1000;
+    }
+    .computer-tab.active { display: block; }
+    .computer-tab button {
+      margin-top: 20px;
+      padding: 8px 16px;
+    }
     .error { color: red; position: absolute; top: 10px; left: 10px; }
   </style>
 </head>
@@ -170,6 +193,11 @@
       </div>
     </div>
   </div>
+  <div class="computer-tab" id="win-tab">
+    <h2>Game Over!</h2>
+    <p id="win-message"></p>
+    <button id="close-tab">OK</button>
+  </div>
 
   <audio id="win-sound" src="The loser has to fall.mp3"></audio>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0-beta.2/chess.min.js"></script>
@@ -185,7 +213,7 @@
     let selectedSquare = null;
     const winSound = document.getElementById('win-sound');
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    let position = null; // Fallback board state
+    let position = null;
     let movesHistory = [];
 
     const pieceSymbols = {
@@ -216,7 +244,6 @@
         }
         return false;
       }
-      // Fallback minimal engine
       const piece = position[from];
       if (!piece) return false;
       const isWhite = piece === piece.toUpperCase();
@@ -244,7 +271,7 @@
     function createBoard() {
       const boardEl = document.getElementById('board');
       boardEl.innerHTML = '';
-      for (let row = 7; row >= 0; row--) {
+      for (let row = 7; row >= 0; row--) { // Top-down for White at bottom
         for (let col = 0; col < 8; col++) {
           const square = document.createElement('div');
           square.classList.add('square');
@@ -278,30 +305,7 @@
           updateBoard();
           updateTicker();
           switchTurn();
-          if (game && game.game_over()) {
-            try {
-              winSound.play().catch(e => {
-                console.log('MP3 play failed:', e);
-                playBeep();
-              });
-              const winner = game.in_checkmate() ? (currentPlayer === 'white' ? 'Black' : 'White') : 'Draw';
-              alert(`Game Over! ${winner}!`);
-              stopClock();
-            } catch (e) { console.log('Game over error:', e); }
-          } else if (!game && (!position['e8'] || !position['e1'])) {
-            try {
-              winSound.play().catch(e => {
-                console.log('MP3 play failed:', e);
-                playBeep();
-              });
-              const winner = !position['e8'] ? 'White' : 'Black';
-              alert(`Game Over! ${winner} wins!`);
-              stopClock();
-            } catch (e) { console.log('Game over error:', e); }
-          } else if (isAI && currentPlayer === 'black') {
-            setTimeout(makeAIMove, 500);
-          }
-          startClock();
+          checkGameOver();
         } else {
           const newPiece = game ? game.get(square) : position[square];
           if (newPiece && ((game && newPiece.color === currentPlayer[0]) || (!game && ((newPiece === newPiece.toUpperCase() && currentPlayer === 'white') || (newPiece === newPiece.toLowerCase() && currentPlayer === 'black'))))) {
@@ -351,19 +355,7 @@
           updateBoard();
           updateTicker();
           switchTurn();
-          if (game.game_over()) {
-            try {
-              winSound.play().catch(e => {
-                console.log('MP3 play failed:', e);
-                playBeep();
-              });
-              const winner = game.in_checkmate() ? 'Black' : 'Draw';
-              alert(`Game Over! ${winner}!`);
-              stopClock();
-            } catch (e) { console.log('Game over error:', e); }
-          } else {
-            startClock();
-          }
+          checkGameOver();
         }
       } else {
         const blackPieces = Object.keys(position).filter(s => position[s] && position[s] === position[s].toLowerCase());
@@ -384,18 +376,7 @@
             updateBoard();
             updateTicker();
             switchTurn();
-            if (!position['e1']) {
-              try {
-                winSound.play().catch(e => {
-                  console.log('MP3 play failed:', e);
-                  playBeep();
-                });
-                alert('Game Over! Black wins!');
-                stopClock();
-              } catch (e) { console.log('Game over error:', e); }
-            } else {
-              startClock();
-            }
+            checkGameOver();
           }
         }
       }
@@ -437,15 +418,8 @@
         else blackTime--;
         updateClock();
         if (whiteTime <= 0 || blackTime <= 0) {
-          try {
-            winSound.play().catch(e => {
-              console.log('MP3 play failed:', e);
-              playBeep();
-            });
-            const winner = whiteTime <= 0 ? 'Black' : 'White';
-            alert(`Time's up! ${winner} wins!`);
-            stopClock();
-          } catch (e) { console.log('Timeout error:', e); }
+          showWinMessage(whiteTime <= 0 ? 'Black' : 'White', 'Time\'s up!');
+          stopClock();
         }
       }, 1000);
     }
@@ -490,6 +464,30 @@
       resetGame();
     }
 
+    function showWinMessage(winner, reason) {
+      const winTab = document.getElementById('win-tab');
+      const winMessage = document.getElementById('win-message');
+      winMessage.textContent = `${reason} ${winner} wins!`;
+      winTab.classList.add('active');
+      try {
+        winSound.play().catch(e => {
+          console.log('MP3 play failed:', e);
+          playBeep();
+        });
+      } catch (e) { console.log('Audio error:', e); }
+      stopClock();
+    }
+
+    function checkGameOver() {
+      if (game && game.game_over()) {
+        const winner = game.in_checkmate() ? (currentPlayer === 'white' ? 'Black' : 'White') : 'Draw';
+        showWinMessage(winner, 'Game Over!');
+      } else if (!game && (!position['e8'] || !position['e1'])) {
+        const winner = !position['e8'] ? 'White' : 'Black';
+        showWinMessage(winner, 'Game Over!');
+      }
+    }
+
     // Button event listeners
     document.getElementById('start').onclick = () => {
       resetGame();
@@ -512,6 +510,9 @@
     document.getElementById('ai-level').onchange = (e) => {
       aiLevel = e.target.value;
       resetGame();
+    };
+    document.getElementById('close-tab').onclick = () => {
+      document.getElementById('win-tab').classList.remove('active');
     };
 
     // Initialize
