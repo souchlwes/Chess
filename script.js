@@ -1,6 +1,6 @@
 const game = new Chess();
 let board;
-let stockfish = new Worker("https://cdn.jsdelivr.net/npm/stockfish@14.0.0/stockfish.min.js");
+let stockfish = new Worker("stockfish.js");
 let isAI = false;
 let currentPlayer = "white";
 let clockTime = 300;
@@ -14,7 +14,9 @@ function initBoard() {
     board = Chessboard("board", {
       position: "start",
       draggable: true,
-      onDrop: handleMove
+      dropOffBoard: "snapback",
+      onDrop: handleMove,
+      pieceTheme: "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png"
     });
     updateTicker();
     startClock();
@@ -29,47 +31,53 @@ function handleMove(source, target) {
   if (!move) return "snapback";
   updateTicker();
   switchTurn();
+  board.position(game.fen()); // Ensure board updates
   if (game.game_over()) {
     try {
       winSound.play().catch((error) => console.error("Audio playback failed:", error));
-      alert("Game Over!");
+      alert(`Game Over! ${game.in_checkmate() ? (currentPlayer === "white" ? "Black wins!" : "White wins!") : "Draw!"}`);
       stopClock();
     } catch (error) {
       console.error("Error during game over:", error);
     }
-  }
-  if (isAI && currentPlayer === "black") {
+  } else if (isAI && currentPlayer === "black") {
     setTimeout(makeAIMove, 500);
   }
+  return null; // Allow move
 }
 
 function makeAIMove() {
   try {
+    stockfish.postMessage("uci");
+    stockfish.postMessage("isready");
     stockfish.postMessage("position fen " + game.fen());
     stockfish.postMessage("go depth 15");
     stockfish.onmessage = function (event) {
       if (event.data.includes("bestmove")) {
         const move = event.data.split(" ")[1];
-        try {
-          const result = game.move({ from: move.slice(0, 2), to: move.slice(2, 4), promotion: "q" });
-          if (result) {
-            board.position(game.fen());
-            updateTicker();
-            switchTurn();
-            if (game.game_over()) {
-              try {
-                winSound.play().catch((error) => console.error("Audio playback failed:", error));
-                alert("Game Over!");
-                stopClock();
-              } catch (error) {
-                console.error("Error during AI game over:", error);
+        if (move && move.length >= 4) {
+          try {
+            const result = game.move({ from: move.slice(0, 2), to: move.slice(2, 4), promotion: "q" });
+            if (result) {
+              board.position(game.fen());
+              updateTicker();
+              switchTurn();
+              if (game.game_over()) {
+                try {
+                  winSound.play().catch((error) => console.error("Audio playback failed:", error));
+                  alert(`Game Over! ${game.in_checkmate() ? "Black wins!" : "Draw!"}`);
+                  stopClock();
+                } catch (error) {
+                  console.error("Error during AI game over:", error);
+                }
               }
+            } else {
+              console.error("Invalid AI move:", move);
+              makeAIMove(); // Retry if move is invalid
             }
-          } else {
-            console.error("Invalid AI move:", move);
+          } catch (error) {
+            console.error("Error processing AI move:", error);
           }
-        } catch (error) {
-          console.error("Error processing AI move:", error);
         }
       }
     };
@@ -84,7 +92,7 @@ function switchTurn() {
 
 function updateTicker() {
   const moves = game.history();
-  document.getElementById("moves").innerText = moves.join(" • ");
+  document.getElementById("moves").innerText = moves.length ? moves.join(" • ") : "No moves yet";
 }
 
 function startClock() {
@@ -96,7 +104,7 @@ function startClock() {
     if (whiteTime <= 0 || blackTime <= 0) {
       try {
         winSound.play().catch((error) => console.error("Audio playback failed:", error));
-        alert("Time's up!");
+        alert(`Time's up! ${whiteTime <= 0 ? "Black wins!" : "White wins!"}`);
         stopClock();
       } catch (error) {
         console.error("Error during time out:", error);
@@ -148,8 +156,11 @@ function resetGame() {
 
 function setClockMode(mode) {
   if (mode === "blitz") clockTime = 300;
-  if (mode === "rapid") clockTime = 900;
-  if (mode === "classical") clockTime = 1800;
+  else if (mode === "rapid") clockTime = 900;
+  else if (mode === "classical") clockTime = 1800;
+  whiteTime = clockTime;
+  blackTime = clockTime;
+  updateClock();
   resetGame();
 }
 
