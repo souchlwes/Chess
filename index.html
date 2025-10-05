@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Brick Chess</title>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://unpkg.com/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css" />
   <style>
     body {
       background: radial-gradient(circle at center, #111 0%, #000 100%);
@@ -216,12 +215,22 @@
     <p id="win-message"></p>
     <button id="close-tab">OK</button>
   </div>
+  <div class="promotion-menu" id="promotion-menu">
+    <button onclick="promote('Q')">Queen</button>
+    <button onclick="promote('R')">Rook</button>
+    <button onclick="promote('B')">Bishop</button>
+    <button onclick="promote('N')">Knight</button>
+  </div>
 
   <audio id="win-sound" src="The loser has to fall.mp3"></audio>
-  <script src="https://unpkg.com/chess.js@1.0.0-beta.2/chess.min.js"></script>
   <script src="https://unpkg.com/stockfish@14.0.0/stockfish.js"></script>
   <script>
-    let game;
+    let position = {
+      a8: 'r', b8: 'n', c8: 'b', d8: 'q', e8: 'k', f8: 'b', g8: 'n', h8: 'r',
+      a7: 'p', b7: 'p', c7: 'p', d7: 'p', e7: 'p', f7: 'p', g7: 'p', h7: 'p',
+      a2: 'P', b2: 'P', c2: 'P', d2: 'P', e2: 'P', f2: 'P', g2: 'P', h2: 'P',
+      a1: 'R', b1: 'N', c1: 'B', d1: 'Q', e1: 'K', f1: 'B', g1: 'N', h1: 'R'
+    };
     let stockfish;
     let isAI = false;
     let aiDepth = 3;
@@ -232,6 +241,10 @@
     let timerInterval;
     let selectedSquare = null;
     let movesHistory = [];
+    let castlingAvailable = { w: { k: true, q: true }, b: { k: true, q: true } };
+    let lastMove = null;
+    let moveCount = 0;
+    let moveHistory = [];
     const winSound = document.getElementById('win-sound');
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -271,14 +284,104 @@
       updateBoard();
     }
 
+    function isValidMove(from, to) {
+      const piece = position[from];
+      if (!piece) return false;
+      const isWhite = piece === piece.toUpperCase();
+      if ((isWhite && currentPlayer !== 'white') || (!isWhite && currentPlayer !== 'black')) return false;
+      const fromRow = 8 - parseInt(from[1]);
+      const toRow = 8 - parseInt(to[1]);
+      const fromCol = from.charCodeAt(0) - 97;
+      const toCol = to.charCodeAt(0) - 97;
+      const colDiff = Math.abs(toCol - fromCol);
+      const rowDiff = toRow - fromRow;
+      const dir = isWhite ? -1 : 1;
+      const target = position[to];
+      const tempPosition = { ...position };
+
+      // Simulate move for validation
+      tempPosition[to] = tempPosition[from];
+      delete tempPosition[from];
+      if (isInCheck(isWhite ? 'w' : 'b', tempPosition)) return false;
+
+      if (piece.toLowerCase() === 'p') {
+        if (colDiff === 0 && !target && rowDiff === dir) return true;
+        if (colDiff === 0 && !target && ((isWhite && fromRow === 6 && toRow === 4 && !position[from[0] + '7'] && !position[from[0] + '6']) || (!isWhite && fromRow === 1 && toRow === 3 && !position[from[0] + '2'] && !position[from[0] + '3']))) return true;
+        if (colDiff === 1 && rowDiff === dir && target && ((isWhite && target === target.toLowerCase()) || (!isWhite && target === target.toUpperCase()))) return true;
+        if (colDiff === 1 && rowDiff === dir && !target && lastMove && lastMove.from[1] === (isWhite ? '2' : '7') && lastMove.to[1] === (isWhite ? '4' : '5') && Math.abs(lastMove.to.charCodeAt(0) - to.charCodeAt(0)) === 1) {
+          return position[to[0] + (isWhite ? '4' : '5')] === (isWhite ? 'p' : 'P');
+        }
+        return false;
+      } else if (piece.toLowerCase() === 'n') {
+        return (colDiff === 2 && rowDiff === 1) || (colDiff === 1 && rowDiff === 2);
+      } else if (piece.toLowerCase() === 'b') {
+        return colDiff === rowDiff && isPathClear(from, to);
+      } else if (piece.toLowerCase() === 'r') {
+        return (colDiff === 0 || rowDiff === 0) && isPathClear(from, to);
+      } else if (piece.toLowerCase() === 'q') {
+        return (colDiff === rowDiff || colDiff === 0 || rowDiff === 0) && isPathClear(from, to);
+      } else if (piece.toLowerCase() === 'k') {
+        if (colDiff <= 1 && rowDiff <= 1) return true;
+        if (colDiff === 2 && rowDiff === 0) {
+          const isKingSide = toCol > fromCol;
+          const rookFrom = isKingSide ? to[0] + to[1] : String.fromCharCode(toCol - 4 + 97) + to[1];
+          const rookTo = isKingSide ? String.fromCharCode(toCol - 1 + 97) + to[1] : String.fromCharCode(toCol + 1 + 97) + to[1];
+          return castlingAvailable[isWhite ? 'w' : 'b'][isKingSide ? 'k' : 'q'] &&
+                 !position[rookFrom.replace(/[a-h]/, c => String.fromCharCode(c.charCodeAt(0) + (isKingSide ? -1 : 1)))] &&
+                 !position[rookTo.replace(/[a-h]/, c => String.fromCharCode(c.charCodeAt(0) + (isKingSide ? -2 : 2)))] &&
+                 !isInCheck(isWhite ? 'w' : 'b') &&
+                 !isInCheckAfterMove(from, to, isWhite ? 'w' : 'b');
+        }
+        return false;
+      }
+      return false;
+    }
+
+    function isPathClear(from, to) {
+      const fromRow = 8 - parseInt(from[1]);
+      const toRow = 8 - parseInt(to[1]);
+      const fromCol = from.charCodeAt(0) - 97;
+      const toCol = to.charCodeAt(0) - 97;
+      const rowStep = Math.sign(toRow - fromRow);
+      const colStep = Math.sign(toCol - fromCol);
+      let row = fromRow + rowStep;
+      let col = fromCol + colStep;
+
+      while (row !== toRow || col !== toCol) {
+        if (position[String.fromCharCode(col + 97) + (8 - row)]) return false;
+        row += rowStep;
+        col += colStep;
+      }
+      return true;
+    }
+
+    function isInCheck(color) {
+      const kingPos = Object.entries(position).find(([_, p]) => p.toLowerCase() === 'k' && (color === 'w' ? p === 'K' : p === 'k'))[0];
+      return Object.entries(position).some(([pos, piece]) => {
+        if ((color === 'w' ? piece === piece.toUpperCase() : piece === piece.toLowerCase()) || !isValidMove(pos, kingPos)) return false;
+        const temp = { ...position };
+        temp[kingPos] = temp[pos];
+        delete temp[pos];
+        return !isInCheckAfterMove(pos, kingPos, color === 'w' ? 'b' : 'w', temp);
+      });
+    }
+
+    function isInCheckAfterMove(from, to, color, pos = position) {
+      const temp = { ...pos };
+      temp[to] = temp[from];
+      delete temp[from];
+      const kingPos = Object.entries(temp).find(([_, p]) => p.toLowerCase() === 'k' && (color === 'w' ? p === 'K' : p === 'k'))[0];
+      return Object.entries(temp).some(([pos, piece]) => {
+        if ((color === 'w' ? piece === piece.toUpperCase() : piece === piece.toLowerCase()) || !isValidMove(pos, kingPos, temp)) return false;
+        return true;
+      });
+    }
+
     function handleSquareClick(row, col) {
       const square = String.fromCharCode(97 + col) + (8 - row);
-      if (!game) return;
-
       if (selectedSquare) {
-        const move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
-        if (move) {
-          movesHistory.push(move.san);
+        if (isValidMove(selectedSquare, square)) {
+          movePiece(selectedSquare, square);
           selectedSquare = null;
           updateBoard();
           updateTicker();
@@ -288,26 +391,76 @@
           selectedSquare = null;
           updateBoard();
         }
-      } else if (game.get(square) && game.get(square).color === currentPlayer[0]) {
+      } else if (position[square] && (position[square] === position[square].toUpperCase() && currentPlayer === 'white' || position[square] === position[square].toLowerCase() && currentPlayer === 'black')) {
         selectedSquare = square;
         updateBoard();
       }
     }
 
+    function movePiece(from, to) {
+      const piece = position[from];
+      const isWhite = piece === piece.toUpperCase();
+      const fromRow = 8 - parseInt(from[1]);
+      const toRow = 8 - parseInt(to[1]);
+      const fromCol = from.charCodeAt(0) - 97;
+      const toCol = to.charCodeAt(0) - 97;
+      const colDiff = Math.abs(toCol - fromCol);
+      const rowDiff = toRow - fromRow;
+
+      if (piece.toLowerCase() === 'k' && colDiff === 2 && rowDiff === 0) {
+        const isKingSide = toCol > fromCol;
+        const rookFrom = isKingSide ? to[0] + to[1] : String.fromCharCode(toCol - 4 + 97) + to[1];
+        const rookTo = isKingSide ? String.fromCharCode(toCol - 1 + 97) + to[1] : String.fromCharCode(toCol + 1 + 97) + to[1];
+        position[rookTo] = position[rookFrom];
+        delete position[rookFrom];
+        castlingAvailable[isWhite ? 'w' : 'b'][isKingSide ? 'k' : 'q'] = false;
+      }
+
+      if (piece.toLowerCase() === 'p' && (toRow === 0 || toRow === 7)) {
+        document.getElementById('promotion-menu').classList.add('active');
+        selectedSquare = to;
+        return;
+      }
+
+      position[to] = position[from];
+      delete position[from];
+      if (piece.toLowerCase() === 'k') castlingAvailable[isWhite ? 'w' : 'b'] = { k: false, q: false };
+      if (piece.toLowerCase() === 'r' && (from === (isWhite ? 'a1' : 'a8') || from === (isWhite ? 'h1' : 'h8'))) castlingAvailable[isWhite ? 'w' : 'b'][from === (isWhite ? 'h1' : 'h8') ? 'k' : 'q'] = false;
+      lastMove = { from, to };
+      moveCount++;
+      moveHistory.push({ fen: getFEN(), turn: currentPlayer });
+    }
+
+    function promote(piece) {
+      if (selectedSquare) {
+        position[selectedSquare] = piece + (currentPlayer === 'white' ? 'w' : 'b').charAt(0);
+        document.getElementById('promotion-menu').classList.remove('active');
+        selectedSquare = null;
+        updateBoard();
+        updateTicker();
+        switchTurn();
+        checkGameOver();
+      }
+    }
+
     function makeAIMove() {
-      if (!isAI || currentPlayer !== 'black' || !game || !stockfish) return;
-      stockfish.postMessage(`position fen ${game.fen()}`);
+      if (!isAI || currentPlayer !== 'black' || !stockfish) return;
+      stockfish.postMessage(`position fen ${getFEN()}`);
       stockfish.postMessage(`go depth ${aiDepth}`);
       stockfish.onmessage = (event) => {
         if (event.data.startsWith('bestmove')) {
           const move = event.data.split(' ')[1];
           if (move && move.length >= 4) {
-            game.move({ from: move.substring(0, 2), to: move.substring(2, 4), promotion: 'q' });
-            movesHistory.push(move);
-            updateBoard();
-            updateTicker();
-            switchTurn();
-            checkGameOver();
+            const from = move.substring(0, 2);
+            const to = move.substring(2, 4);
+            if (isValidMove(from, to)) {
+              movePiece(from, to);
+              movesHistory.push(`${position[to].toUpperCase()}${to}`);
+              updateBoard();
+              updateTicker();
+              switchTurn();
+              checkGameOver();
+            }
           }
         }
       };
@@ -323,15 +476,11 @@
         for (let col = 0; col < 8; col++) {
           const squareEl = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
           const square = String.fromCharCode(97 + col) + (8 - row);
-          const piece = game ? game.get(square) : null;
-          squareEl.textContent = piece ? pieceSymbols[piece.type.toUpperCase() + (piece.color === 'w' ? '' : piece.type.toLowerCase())] : '';
+          squareEl.textContent = position[square] ? pieceSymbols[position[square].toUpperCase() + (position[square] === position[square].toLowerCase() ? position[square].toLowerCase() : '')] : '';
           squareEl.classList.remove('selected', 'valid', 'black-piece');
-          if (piece && piece.color === 'b') squareEl.classList.add('black-piece');
+          if (position[square] && position[square] === position[square].toLowerCase()) squareEl.classList.add('black-piece');
           if (selectedSquare === square) squareEl.classList.add('selected');
-          else if (selectedSquare) {
-            const moves = game.moves({ square: selectedSquare, verbose: true });
-            if (moves.some(m => m.to === square)) squareEl.classList.add('valid');
-          }
+          else if (selectedSquare && isValidMove(selectedSquare, square)) squareEl.classList.add('valid');
         }
       }
     }
@@ -363,7 +512,16 @@
     }
 
     function resetGame() {
-      if (game) game.reset();
+      position = {
+        a8: 'r', b8: 'n', c8: 'b', d8: 'q', e8: 'k', f8: 'b', g8: 'n', h8: 'r',
+        a7: 'p', b7: 'p', c7: 'p', d7: 'p', e7: 'p', f7: 'p', g7: 'p', h7: 'p',
+        a2: 'P', b2: 'P', c2: 'P', d2: 'P', e2: 'P', f2: 'P', g2: 'P', h2: 'P',
+        a1: 'R', b1: 'N', c1: 'B', d1: 'Q', e1: 'K', f1: 'B', g1: 'N', h1: 'R'
+      };
+      castlingAvailable = { w: { k: true, q: true }, b: { k: true, q: true } };
+      lastMove = null;
+      moveCount = 0;
+      moveHistory = [];
       whiteTime = clockTime;
       blackTime = clockTime;
       currentPlayer = 'white';
@@ -405,20 +563,50 @@
     }
 
     function checkGameOver() {
-      if (game && game.game_over()) {
-        const winner = game.in_checkmate() ? (currentPlayer === 'white' ? 'Black' : 'White') : game.in_draw() ? 'Draw' : '';
-        if (winner) showWinMessage(winner, 'Game Over!');
+      const legalMoves = Object.keys(position).filter(pos => {
+        const piece = position[pos];
+        return (piece === piece.toUpperCase() && currentPlayer === 'white' || piece === piece.toLowerCase() && currentPlayer === 'black') &&
+               Object.keys(position).some(to => isValidMove(pos, to));
+      });
+      const isCheck = isInCheck(currentPlayer === 'white' ? 'w' : 'b');
+      if (legalMoves.length === 0) {
+        if (isCheck) showWinMessage(currentPlayer === 'white' ? 'Black' : 'White', 'Checkmate!');
+        else showWinMessage('Draw', 'Stalemate!');
+      } else if (moveCount >= 100 && moveHistory.slice(-100).every((m, i, arr) => i % 2 === 0 || !arr.slice(0, i).some(p => p.fen === m.fen && p.turn === m.turn))) {
+        showWinMessage('Draw', '50-move rule!');
+      } else if (new Set(moveHistory.map(m => m.fen + m.turn)).size <= 3) {
+        showWinMessage('Draw', 'Threefold repetition!');
+      } else if (Object.values(position).filter(p => p).length <= 4 && !Object.values(position).some(p => 'qr'.includes(p.toLowerCase()))) {
+        showWinMessage('Draw', 'Insufficient material!');
+      } else if (whiteTime <= 0 || blackTime <= 0) {
+        showWinMessage(whiteTime <= 0 ? 'Black' : 'White', 'Time\'s up!');
       }
     }
 
-    document.getElementById('start').onclick = () => {
-      if (!game) {
-        if (typeof Chess !== 'undefined') game = new Chess();
-        else {
-          document.body.innerHTML += '<div class="error">Error: Chess.js failed to load. Game cannot start.</div>';
-          return;
+    function getFEN() {
+      let fen = '';
+      for (let row = 8; row >= 1; row--) {
+        let empty = 0;
+        for (let col = 0; col < 8; col++) {
+          const square = String.fromCharCode(97 + col) + row;
+          if (position[square]) {
+            if (empty > 0) { fen += empty; empty = 0; }
+            fen += position[square];
+          } else {
+            empty++;
+          }
         }
+        if (empty > 0) fen += empty;
+        if (row > 1) fen += '/';
       }
+      fen += ` ${currentPlayer[0]} `;
+      fen += (castlingAvailable.w.k ? 'K' : '') + (castlingAvailable.w.q ? 'Q' : '') +
+             (castlingAvailable.b.k ? 'k' : '') + (castlingAvailable.b.q ? 'q' : '') || '-';
+      fen += ' - 0 1';
+      return fen;
+    }
+
+    document.getElementById('start').onclick = () => {
       resetGame();
       startClock();
     };
@@ -446,8 +634,6 @@
 
     window.addEventListener('load', () => {
       winSound.load();
-      if (typeof Chess !== 'undefined') game = new Chess();
-      else document.body.innerHTML += '<div class="error">Warning: Chess.js failed to load. Game may not function.</div>';
       if (typeof Worker !== 'undefined') stockfish = new Worker('https://unpkg.com/stockfish@14.0.0/stockfish.js');
       else console.log('Worker not supported, AI disabled');
       createBoard();
