@@ -79,13 +79,15 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 24px;
+      font-size: 28px; /* Larger for visibility */
       cursor: pointer;
       user-select: none;
-      text-shadow: 0 0 2px #000, 0 0 2px #000;
+      text-shadow: 0 0 3px #000, 0 0 3px #000; /* Stronger outline */
+      color: #fff; /* White pieces */
     }
-    .square.light { background: #e6d5a8; }
-    .square.dark { background: #8b5a2b; }
+    .square.black-piece { color: #000; } /* Black pieces */
+    .square.light { background: #f5e8c7; } /* Brighter beige */
+    .square.dark { background: #7a5230; } /* Darker brown */
     .square.selected { background: #ffeb3b !important; }
     .square.valid { background: #4caf50 !important; }
     .info {
@@ -181,11 +183,26 @@
     let timerInterval;
     let selectedSquare = null;
     const winSound = document.getElementById('win-sound');
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
     const pieceSymbols = {
       'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔',
       'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚'
     };
+
+    function playBeep() {
+      try {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = 800;
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+      } catch (e) { console.log('Beep failed:', e); }
+    }
 
     function createBoard() {
       const boardEl = document.getElementById('board');
@@ -217,7 +234,10 @@
           switchTurn();
           if (game.game_over()) {
             try {
-              winSound.play().catch(e => console.log('Audio play failed:', e));
+              winSound.play().catch(e => {
+                console.log('MP3 play failed:', e);
+                playBeep(); // Fallback to beep
+              });
               const winner = game.in_checkmate() ? (currentPlayer === 'white' ? 'Black' : 'White') : 'Draw';
               alert(`Game Over! ${winner}!`);
               stopClock();
@@ -274,7 +294,10 @@
         switchTurn();
         if (game.game_over()) {
           try {
-            winSound.play().catch(e => console.log('Audio play failed:', e));
+            winSound.play().catch(e => {
+              console.log('MP3 play failed:', e);
+              playBeep(); // Fallback to beep
+            });
             const winner = game.in_checkmate() ? 'Black' : 'Draw';
             alert(`Game Over! ${winner}!`);
             stopClock();
@@ -296,7 +319,8 @@
           const square = String.fromCharCode(97 + col) + (row + 1);
           const piece = game.get(square);
           squareEl.textContent = piece ? pieceSymbols[piece.type.toUpperCase() + (piece.color === 'w' ? '' : piece.type.toLowerCase())] || '' : '';
-          squareEl.classList.remove('selected', 'valid');
+          squareEl.classList.remove('selected', 'valid', 'black-piece');
+          if (piece && piece.color === 'b') squareEl.classList.add('black-piece');
           if (selectedSquare === square) {
             squareEl.classList.add('selected');
           } else if (selectedSquare) {
@@ -322,7 +346,10 @@
         updateClock();
         if (whiteTime <= 0 || blackTime <= 0) {
           try {
-            winSound.play().catch(e => console.log('Audio play failed:', e));
+            winSound.play().catch(e => {
+              console.log('MP3 play failed:', e);
+              playBeep(); // Fallback to beep
+            });
             const winner = whiteTime <= 0 ? 'Black' : 'White';
             alert(`Time's up! ${winner} wins!`);
             stopClock();
@@ -394,8 +421,7 @@
       }
       createBoard();
       resetGame();
-      // Preload audio to avoid delays
-      winSound.load();
+      winSound.load(); // Preload audio
     });
   </script>
 </body>
