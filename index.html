@@ -16,11 +16,12 @@
       height: 100vh;
       margin: 0;
       position: relative;
+      overflow: hidden;
     }
     .console { perspective: 1000px; }
     .shell {
-      width: 360px;
-      height: 620px;
+      width: 400px;
+      height: 660px;
       background: linear-gradient(to bottom, #2a5fb8, #1c3f7a);
       border-radius: 20px;
       box-shadow: 0 0 20px #0f0, inset 0 0 10px #000;
@@ -44,14 +45,14 @@
       top: 10px;
       left: 10px;
       display: flex;
-      gap: 240px;
+      gap: 280px;
       font-size: 20px;
       color: #fff;
       text-shadow: 0 0 5px #0ff;
     }
     .screen {
-      width: 280px;
-      height: 280px;
+      width: 320px;
+      height: 320px;
       background: linear-gradient(to bottom, #0f0, #060);
       border: 4px inset #003300;
       box-shadow: inset 0 0 10px #003300, 0 0 10px #0f0;
@@ -67,8 +68,8 @@
       to { box-shadow: inset 0 0 15px #003300, 0 0 15px #0f0; }
     }
     #board {
-      width: 100%;
-      height: 220px;
+      width: 288px;
+      height: 288px;
       display: grid;
       grid-template-columns: repeat(8, 1fr);
       grid-template-rows: repeat(8, 1fr);
@@ -80,15 +81,15 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 30px; /* Large for visibility */
+      font-size: 28px;
       cursor: pointer;
       user-select: none;
-      text-shadow: 0 0 5px #000, 0 0 5px #000; /* Enhanced contrast */
-      color: #fff; /* White pieces */
+      text-shadow: 0 0 8px #000, 0 0 8px #000;
+      color: #ffffff;
     }
-    .square.black-piece { color: #000; } /* Black pieces */
-    .square.light { background: #fff8e1; } /* Bright beige */
-    .square.dark { background: #6b4e31; } /* Dark brown */
+    .square.black-piece { color: #000000; }
+    .square.light { background: #fff8e1; }
+    .square.dark { background: #6b4e31; }
     .square.selected { background: #ffeb3b !important; }
     .square.valid { background: #4caf50 !important; }
     .info {
@@ -116,7 +117,7 @@
     #moves::-webkit-scrollbar-thumb { background: #0f0; }
     #moves::-webkit-scrollbar-track { background: #000; }
     .controls {
-      width: 280px;
+      width: 320px;
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 10px;
@@ -154,13 +155,28 @@
       text-align: center;
       padding: 20px;
       z-index: 1000;
+      font-size: 14px;
     }
-    .computer-tab.active { display: block; }
+    .computer-tab.active { display: flex; flex-direction: column; justify-content: center; }
     .computer-tab button {
       margin-top: 20px;
       padding: 8px 16px;
+      font-size: 12px;
     }
     .error { color: red; position: absolute; top: 10px; left: 10px; }
+    .promotion-menu {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #2a5fb8;
+      border: 2px solid #0f0;
+      padding: 10px;
+      z-index: 1001;
+    }
+    .promotion-menu.active { display: block; }
+    .promotion-menu button { margin: 5px; }
   </style>
 </head>
 <body>
@@ -198,6 +214,12 @@
     <p id="win-message"></p>
     <button id="close-tab">OK</button>
   </div>
+  <div class="promotion-menu" id="promotion-menu">
+    <button onclick="promote('Q')">Queen</button>
+    <button onclick="promote('R')">Rook</button>
+    <button onclick="promote('B')">Bishop</button>
+    <button onclick="promote('N')">Knight</button>
+  </div>
 
   <audio id="win-sound" src="The loser has to fall.mp3"></audio>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0-beta.2/chess.min.js"></script>
@@ -215,6 +237,8 @@
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     let position = null;
     let movesHistory = [];
+    let castlingAvailable = { w: { k: true, q: true }, b: { k: true, q: true } };
+    let lastMove = null;
 
     const pieceSymbols = {
       'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔',
@@ -237,7 +261,7 @@
 
     function isValidMove(from, to) {
       if (game && typeof game.move === 'function') {
-        const move = game.move({ from, to, promotion: 'q', verbose: true });
+        const move = game.move({ from, to, promotion: 'q' });
         if (move) {
           game.undo();
           return true;
@@ -248,22 +272,45 @@
       if (!piece) return false;
       const isWhite = piece === piece.toUpperCase();
       if ((isWhite && currentPlayer !== 'white') || (!isWhite && currentPlayer !== 'black')) return false;
-      const fromRow = parseInt(from[1]);
-      const toRow = parseInt(to[1]);
-      const fromCol = from[0].charCodeAt(0) - 97;
-      const toCol = to[0].charCodeAt(0) - 97;
+      const fromRow = 8 - parseInt(from[1]);
+      const toRow = 8 - parseInt(to[1]);
+      const fromCol = from.charCodeAt(0) - 97;
+      const toCol = to.charCodeAt(0) - 97;
       const colDiff = Math.abs(toCol - fromCol);
       const rowDiff = toRow - fromRow;
-      const dir = isWhite ? 1 : -1;
+      const dir = isWhite ? -1 : 1;
       const target = position[to];
 
       if (piece.toLowerCase() === 'p') {
         if (colDiff === 0 && !target && rowDiff === dir) return true;
-        if (colDiff === 0 && !target && ((isWhite && fromRow === 2 && toRow === 4 && !position[from[0] + '3']) || (!isWhite && fromRow === 7 && toRow === 5 && !position[from[0] + '6']))) return true;
-        if (colDiff === 1 && rowDiff === dir && target) return true;
+        if (colDiff === 0 && !target && ((isWhite && fromRow === 6 && toRow === 4 && !position[from[0] + '7'] && !position[from[0] + '6']) || (!isWhite && fromRow === 1 && toRow === 3 && !position[from[0] + '2'] && !position[from[0] + '3']))) return true;
+        if (colDiff === 1 && rowDiff === dir && target && ((isWhite && target === target.toLowerCase()) || (!isWhite && target === target.toUpperCase()))) return true;
+        if (colDiff === 1 && rowDiff === dir && !target && lastMove && lastMove.from[1] === (isWhite ? '2' : '7') && lastMove.to[1] === (isWhite ? '4' : '5') && Math.abs(lastMove.to.charCodeAt(0) - to.charCodeAt(0)) === 1) {
+          return position[to[0] + (isWhite ? '4' : '5')] === (isWhite ? 'p' : 'P');
+        }
+        return false;
       } else if (piece.toLowerCase() === 'n') {
         const knightMoves = [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]];
         return knightMoves.some(([r, c]) => rowDiff === r && colDiff === Math.abs(c));
+      } else if (piece.toLowerCase() === 'k') {
+        if (colDiff <= 1 && rowDiff <= 1) return true;
+        if (colDiff === 2 && rowDiff === 0 && !target) {
+          const kingSide = toCol === 6;
+          const rookFrom = kingSide ? 'h' + (isWhite ? '1' : '8') : 'a' + (isWhite ? '1' : '8');
+          const rookTo = kingSide ? 'f' + (isWhite ? '1' : '8') : 'd' + (isWhite ? '1' : '8');
+          return castlingAvailable[isWhite ? 'w' : 'b'][kingSide ? 'k' : 'q'] &&
+                 position[rookFrom] === (isWhite ? 'R' : 'r') &&
+                 !Object.keys(position).some(s => {
+                   const r = 8 - parseInt(s[1]);
+                   const c = s.charCodeAt(0) - 97;
+                   return position[s] && r === (isWhite ? 1 : 8) && c >= (kingSide ? 5 : 3) && c <= (kingSide ? 6 : 4);
+                 });
+        }
+        return false;
+      } else if (piece.toLowerCase() === 'q' || piece.toLowerCase() === 'r') {
+        return colDiff === 0 || rowDiff === 0;
+      } else if (piece.toLowerCase() === 'b') {
+        return colDiff === rowDiff;
       }
       return !target || (isWhite && target === target.toLowerCase()) || (!isWhite && target === target.toUpperCase());
     }
@@ -271,7 +318,7 @@
     function createBoard() {
       const boardEl = document.getElementById('board');
       boardEl.innerHTML = '';
-      for (let row = 7; row >= 0; row--) { // Top-down for White at bottom
+      for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
           const square = document.createElement('div');
           square.classList.add('square');
@@ -286,20 +333,48 @@
     }
 
     function handleSquareClick(row, col) {
-      const square = String.fromCharCode(97 + col) + (row + 1);
+      const square = String.fromCharCode(97 + col) + (8 - row);
       const piece = game ? game.get(square) : position[square];
 
       if (selectedSquare) {
         if (isValidMove(selectedSquare, square)) {
+          const fromRow = 8 - parseInt(selectedSquare[1]);
+          const toRow = 8 - parseInt(square[1]);
+          const fromCol = selectedSquare.charCodeAt(0) - 97;
+          const toCol = square.charCodeAt(0) - 97;
+          const colDiff = Math.abs(toCol - fromCol);
+          const rowDiff = toRow - fromRow;
+          const isWhite = game ? game.get(selectedSquare).color === 'w' : position[selectedSquare] === position[selectedSquare].toUpperCase();
+
           if (game) {
-            const move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
+            const move = game.move({ from: selectedSquare, to: square });
             if (move) {
               movesHistory.push(move.san);
+              lastMove = { from: selectedSquare, to: square };
+              if (move.flags.includes('k')) castlingAvailable[move.color === 'w' ? 'w' : 'b'].k = false;
+              if (move.flags.includes('q')) castlingAvailable[move.color === 'w' ? 'w' : 'b'].q = false;
             }
           } else {
             position[square] = position[selectedSquare];
             delete position[selectedSquare];
+            if (piece.toLowerCase() === 'p' && (toRow === 0 || toRow === 7)) {
+              document.getElementById('promotion-menu').classList.add('active');
+              selectedSquare = square;
+              return;
+            }
+            if (piece.toLowerCase() === 'p' && colDiff === 1 && rowDiff === (isWhite ? -2 : 2) && !position[square]) {
+              delete position[square[0] + (isWhite ? '5' : '4')];
+            }
+            if (piece.toLowerCase() === 'k' && colDiff === 2) {
+              const kingSide = toCol === 6;
+              const rookFrom = kingSide ? 'h' + (isWhite ? '1' : '8') : 'a' + (isWhite ? '1' : '8');
+              const rookTo = kingSide ? 'f' + (isWhite ? '1' : '8') : 'd' + (isWhite ? '1' : '8');
+              position[rookTo] = position[rookFrom];
+              delete position[rookFrom];
+              castlingAvailable[isWhite ? 'w' : 'b'][kingSide ? 'k' : 'q'] = false;
+            }
             movesHistory.push(`${selectedSquare}-${square}`);
+            lastMove = { from: selectedSquare, to: square };
           }
           selectedSquare = null;
           updateBoard();
@@ -307,14 +382,8 @@
           switchTurn();
           checkGameOver();
         } else {
-          const newPiece = game ? game.get(square) : position[square];
-          if (newPiece && ((game && newPiece.color === currentPlayer[0]) || (!game && ((newPiece === newPiece.toUpperCase() && currentPlayer === 'white') || (newPiece === newPiece.toLowerCase() && currentPlayer === 'black'))))) {
-            selectedSquare = square;
-            updateBoard();
-          } else {
-            selectedSquare = null;
-            updateBoard();
-          }
+          selectedSquare = null;
+          updateBoard();
         }
       } else {
         if (piece && ((game && piece.color === currentPlayer[0]) || (!game && ((piece === piece.toUpperCase() && currentPlayer === 'white') || (piece === piece.toLowerCase() && currentPlayer === 'black'))))) {
@@ -328,7 +397,7 @@
       const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
       let score = 0;
       if (move.captured) score += pieceValues[move.captured.toLowerCase()];
-      if (move.flags && move.flags.includes('p')) score += 5;
+      if (move.flags && move.flags.includes('c')) score += 5;
       if (move.san && move.san.includes('+')) score += 2;
       return score + Math.random() * 0.1;
     }
@@ -350,7 +419,7 @@
             const scored = moves.map(m => ({ move: m, score: evaluateMove(m) }));
             move = scored.reduce((best, curr) => curr.score > best.score ? curr : best, scored[0]).move;
           }
-          game.move({ from: move.from, to: move.to, promotion: 'q' });
+          game.move(move);
           movesHistory.push(move.san);
           updateBoard();
           updateTicker();
@@ -358,25 +427,19 @@
           checkGameOver();
         }
       } else {
-        const blackPieces = Object.keys(position).filter(s => position[s] && position[s] === position[s].toLowerCase());
-        if (blackPieces.length) {
-          const from = blackPieces[Math.floor(Math.random() * blackPieces.length)];
-          const possibleMoves = [];
-          for (let row = 1; row <= 8; row++) {
+        const pieces = Object.keys(position).filter(s => position[s] && ((position[s] === position[s].toLowerCase() && currentPlayer === 'black') || (position[s] === position[s].toUpperCase() && currentPlayer === 'white')));
+        if (pieces.length) {
+          const from = pieces[Math.floor(Math.random() * pieces.length)];
+          const fromRow = 8 - parseInt(from[1]);
+          const fromCol = from.charCodeAt(0) - 97;
+          for (let row = 0; row < 8; row++) {
             for (let col = 0; col < 8; col++) {
-              const to = String.fromCharCode(97 + col) + row;
-              if (isValidMove(from, to)) possibleMoves.push(to);
+              const to = String.fromCharCode(97 + col) + (8 - row);
+              if (isValidMove(from, to)) {
+                handleSquareClick(row, col); // Reuse move logic
+                return;
+              }
             }
-          }
-          if (possibleMoves.length) {
-            const to = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-            position[to] = position[from];
-            delete position[from];
-            movesHistory.push(`${from}-${to}`);
-            updateBoard();
-            updateTicker();
-            switchTurn();
-            checkGameOver();
           }
         }
       }
@@ -384,13 +447,14 @@
 
     function switchTurn() {
       currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
+      if (isAI && currentPlayer === 'black') setTimeout(makeAIMove, 500);
     }
 
     function updateBoard() {
-      for (let row = 7; row >= 0; row--) {
+      for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
           const squareEl = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-          const square = String.fromCharCode(97 + col) + (row + 1);
+          const square = String.fromCharCode(97 + col) + (8 - row);
           const piece = game ? game.get(square) : position[square];
           squareEl.textContent = piece ? (game ? pieceSymbols[piece.type.toUpperCase() + (piece.color === 'w' ? '' : piece.type.toLowerCase())] : pieceSymbols[piece]) || '' : '';
           squareEl.classList.remove('selected', 'valid', 'black-piece');
@@ -442,6 +506,7 @@
           a2: 'P', b2: 'P', c2: 'P', d2: 'P', e2: 'P', f2: 'P', g2: 'P', h2: 'P',
           a1: 'R', b1: 'N', c1: 'B', d1: 'Q', e1: 'K', f1: 'B', g1: 'N', h1: 'R'
         };
+        castlingAvailable = { w: { k: true, q: true }, b: { k: true, q: true } };
       }
       whiteTime = clockTime;
       blackTime = clockTime;
@@ -449,6 +514,7 @@
       selectedSquare = null;
       isAI = false;
       movesHistory = [];
+      lastMove = null;
       updateBoard();
       updateTicker();
       updateClock();
@@ -465,8 +531,13 @@
     }
 
     function showWinMessage(winner, reason) {
+      console.log('Showing win message:', winner, reason);
       const winTab = document.getElementById('win-tab');
       const winMessage = document.getElementById('win-message');
+      if (!winTab || !winMessage) {
+        console.error('Win tab elements not found');
+        return;
+      }
       winMessage.textContent = `${reason} ${winner} wins!`;
       winTab.classList.add('active');
       try {
@@ -480,15 +551,86 @@
 
     function checkGameOver() {
       if (game && game.game_over()) {
-        const winner = game.in_checkmate() ? (currentPlayer === 'white' ? 'Black' : 'White') : 'Draw';
-        showWinMessage(winner, 'Game Over!');
-      } else if (!game && (!position['e8'] || !position['e1'])) {
-        const winner = !position['e8'] ? 'White' : 'Black';
-        showWinMessage(winner, 'Game Over!');
+        const winner = game.in_checkmate() ? (currentPlayer === 'white' ? 'Black' : 'White') : game.in_draw() ? 'Draw' : '';
+        if (winner) showWinMessage(winner, 'Game Over!');
+      } else if (!game) {
+        const whiteKing = Object.keys(position).some(s => position[s] === 'K');
+        const blackKing = Object.keys(position).some(s => position[s] === 'k');
+        if (!whiteKing || !blackKing) {
+          const winner = !whiteKing ? 'Black' : 'White';
+          showWinMessage(winner, 'Game Over!');
+        } else {
+          const kingSquare = Object.keys(position).find(s => position[s] === (currentPlayer === 'white' ? 'k' : 'K'));
+          if (kingSquare) {
+            const kingRow = 8 - parseInt(kingSquare[1]);
+            const kingCol = kingSquare.charCodeAt(0) - 97;
+            const isCheck = Object.keys(position).some(s => {
+              const p = position[s];
+              const r = 8 - parseInt(s[1]);
+              const c = s.charCodeAt(0) - 97;
+              if ((currentPlayer === 'white' && p === p.toUpperCase()) || (currentPlayer === 'black' && p === p.toLowerCase())) return false;
+              const diffRow = Math.abs(r - kingRow);
+              const diffCol = Math.abs(c - kingCol);
+              if (p.toLowerCase() === 'q' || p.toLowerCase() === 'r') return diffRow === 0 || diffCol === 0;
+              if (p.toLowerCase() === 'b') return diffRow === diffCol;
+              if (p.toLowerCase() === 'p') return diffRow === 1 && diffCol === 1 && ((currentPlayer === 'white' && r === kingRow - 1) || (currentPlayer === 'black' && r === kingRow + 1));
+              if (p.toLowerCase() === 'n') return (diffRow === 2 && diffCol === 1) || (diffRow === 1 && diffCol === 2);
+              return false;
+            });
+            if (isCheck) {
+              const legalMoves = Object.keys(position).filter(s => position[s] === (currentPlayer === 'white' ? 'k' : 'K')).some(k => {
+                for (let r = -1; r <= 1; r++) for (let c = -1; c <= 1; c++) {
+                  const newRow = kingRow + r;
+                  const newCol = kingCol + c;
+                  if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+                    const newSquare = String.fromCharCode(97 + newCol) + (8 - newRow);
+                    if (!position[newSquare] || (position[newSquare] !== position[newSquare].toUpperCase() && currentPlayer === 'white') || (position[newSquare] !== position[newSquare].toLowerCase() && currentPlayer === 'black')) {
+                      const temp = position[k];
+                      position[newSquare] = temp;
+                      delete position[k];
+                      const stillCheck = Object.keys(position).some(s => {
+                        const p = position[s];
+                        const r2 = 8 - parseInt(s[1]);
+                        const c2 = s.charCodeAt(0) - 97;
+                        if ((currentPlayer === 'white' && p === p.toUpperCase()) || (currentPlayer === 'black' && p === p.toLowerCase())) return false;
+                        const diffRow2 = Math.abs(r2 - newRow);
+                        const diffCol2 = Math.abs(c2 - newCol);
+                        if (p.toLowerCase() === 'q' || p.toLowerCase() === 'r') return diffRow2 === 0 || diffCol2 === 0;
+                        if (p.toLowerCase() === 'b') return diffRow2 === diffCol2;
+                        if (p.toLowerCase() === 'p') return diffRow2 === 1 && diffCol2 === 1;
+                        if (p.toLowerCase() === 'n') return (diffRow2 === 2 && diffCol2 === 1) || (diffRow2 === 1 && diffCol2 === 2);
+                        return false;
+                      });
+                      position[k] = temp;
+                      delete position[newSquare];
+                      if (!stillCheck) return true;
+                    }
+                  }
+                }
+                return false;
+              });
+              if (!legalMoves) showWinMessage(currentPlayer === 'white' ? 'Black' : 'White', 'Checkmate!');
+            }
+          }
+        }
       }
     }
 
-    // Button event listeners
+    function promote(piece) {
+      const isWhite = game ? game.get(selectedSquare).color === 'w' : position[selectedSquare] === position[selectedSquare].toUpperCase();
+      if (game) {
+        game.move({ from: selectedSquare, to: selectedSquare, promotion: piece.toLowerCase() });
+      } else {
+        position[selectedSquare] = isWhite ? piece : piece.toLowerCase();
+      }
+      document.getElementById('promotion-menu').classList.remove('active');
+      selectedSquare = null;
+      updateBoard();
+      updateTicker();
+      switchTurn();
+      checkGameOver();
+    }
+
     document.getElementById('start').onclick = () => {
       resetGame();
       startClock();
@@ -515,9 +657,8 @@
       document.getElementById('win-tab').classList.remove('active');
     };
 
-    // Initialize
     window.addEventListener('load', () => {
-      winSound.load(); // Preload audio
+      winSound.load();
       if (typeof Chess === 'undefined') {
         document.body.innerHTML += '<div class="error">Warning: Chess.js failed to load. Using fallback engine.</div>';
         position = {
