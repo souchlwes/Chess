@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Brick Chess</title>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css" />
   <style>
     body {
       background: radial-gradient(circle at center, #111 0%, #000 100%);
@@ -20,8 +21,8 @@
     }
     .console { perspective: 1000px; }
     .shell {
-      width: 440px; /* Slightly wider for balance */
-      height: 700px; /* Adjusted for screen and controls */
+      width: 440px;
+      height: 700px;
       background: linear-gradient(to bottom, #2a5fb8, #1c3f7a);
       border-radius: 20px;
       box-shadow: 0 0 20px #0f0, inset 0 0 10px #000;
@@ -32,7 +33,7 @@
       align-items: center;
       gap: 15px;
       position: relative;
-      border: 2px solid #0f0; /* Added detail */
+      border: 2px solid #0f0;
     }
     .logo {
       position: absolute;
@@ -46,13 +47,13 @@
       top: 10px;
       left: 10px;
       display: flex;
-      gap: 320px; /* Adjusted for shell width */
+      gap: 320px;
       font-size: 20px;
       color: #fff;
       text-shadow: 0 0 5px #0ff;
     }
     .screen {
-      width: 400px; /* Optimized for 360px board */
+      width: 400px;
       height: 400px;
       background: linear-gradient(to bottom, #0f0, #060);
       border: 4px inset #003300;
@@ -69,7 +70,7 @@
       to { box-shadow: inset 0 0 15px #003300, 0 0 15px #0f0; }
     }
     #board {
-      width: 360px; /* 45px x 8 squares */
+      width: 360px;
       height: 360px;
       display: grid;
       grid-template-columns: repeat(8, 1fr);
@@ -85,7 +86,7 @@
       font-size: 28px;
       cursor: pointer;
       user-select: none;
-      text-shadow: 0 0 12px #000, 0 0 12px #000; /* Improved contrast */
+      text-shadow: 0 0 12px #000, 0 0 12px #000;
       color: #ffffff;
     }
     .square.black-piece { color: #000000; }
@@ -164,7 +165,7 @@
       padding: 8px 16px;
       font-size: 12px;
     }
-    .error { color: red; position: absolute; top: 10px; left: 10px; font-size: 12px; }
+    .error { color: red; position: absolute; top: 10px; left: 10px; font-size: 10px; background: #000; padding: 5px; border: 1px solid #f00; }
     .promotion-menu {
       display: none;
       position: absolute;
@@ -203,9 +204,9 @@
           <option value="classical">CLASSICAL</option>
         </select>
         <select id="ai-level">
-          <option value="easy">AI: Easy</option>
-          <option value="medium">AI: Medium</option>
-          <option value="hard">AI: Hard</option>
+          <option value="3">AI: Easy</option>
+          <option value="8">AI: Medium</option>
+          <option value="12">AI: Hard</option>
         </select>
       </div>
     </div>
@@ -215,28 +216,24 @@
     <p id="win-message"></p>
     <button id="close-tab">OK</button>
   </div>
-  <div class="promotion-menu" id="promotion-menu">
-    <button onclick="promote('Q')">Queen</button>
-    <button onclick="promote('R')">Rook</button>
-    <button onclick="promote('B')">Bishop</button>
-    <button onclick="promote('N')">Knight</button>
-  </div>
 
   <audio id="win-sound" src="The loser has to fall.mp3"></audio>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0-beta.2/chess.min.js"></script>
+  <script src="https://unpkg.com/chess.js@1.0.0-beta.2/chess.min.js"></script>
+  <script src="https://unpkg.com/stockfish@14.0.0/stockfish.js"></script>
   <script>
     let game;
+    let stockfish;
     let isAI = false;
-    let aiLevel = 'easy'; // Simplified to one level for stability
+    let aiDepth = 3;
     let currentPlayer = 'white';
     let clockTime = 300;
     let whiteTime = clockTime;
     let blackTime = clockTime;
     let timerInterval;
     let selectedSquare = null;
+    let movesHistory = [];
     const winSound = document.getElementById('win-sound');
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    let movesHistory = [];
 
     const pieceSymbols = {
       'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔',
@@ -298,17 +295,22 @@
     }
 
     function makeAIMove() {
-      if (!isAI || currentPlayer !== 'black' || !game) return;
-      const moves = game.moves();
-      if (moves.length) {
-        const move = moves[Math.floor(Math.random() * moves.length)];
-        game.move(move);
-        movesHistory.push(move);
-        updateBoard();
-        updateTicker();
-        switchTurn();
-        checkGameOver();
-      }
+      if (!isAI || currentPlayer !== 'black' || !game || !stockfish) return;
+      stockfish.postMessage(`position fen ${game.fen()}`);
+      stockfish.postMessage(`go depth ${aiDepth}`);
+      stockfish.onmessage = (event) => {
+        if (event.data.startsWith('bestmove')) {
+          const move = event.data.split(' ')[1];
+          if (move && move.length >= 4) {
+            game.move({ from: move.substring(0, 2), to: move.substring(2, 4), promotion: 'q' });
+            movesHistory.push(move);
+            updateBoard();
+            updateTicker();
+            switchTurn();
+            checkGameOver();
+          }
+        }
+      };
     }
 
     function switchTurn() {
@@ -409,18 +411,6 @@
       }
     }
 
-    function promote(piece) {
-      if (game) {
-        game.move({ from: selectedSquare, to: selectedSquare, promotion: piece.toLowerCase() });
-        document.getElementById('promotion-menu').classList.remove('active');
-        selectedSquare = null;
-        updateBoard();
-        updateTicker();
-        switchTurn();
-        checkGameOver();
-      }
-    }
-
     document.getElementById('start').onclick = () => {
       if (!game) {
         if (typeof Chess !== 'undefined') game = new Chess();
@@ -447,7 +437,7 @@
     };
     document.getElementById('mode-select').onchange = (e) => setClockMode(e.target.value);
     document.getElementById('ai-level').onchange = (e) => {
-      aiLevel = e.target.value;
+      aiDepth = parseInt(e.target.value);
       resetGame();
     };
     document.getElementById('close-tab').onclick = () => {
@@ -458,17 +448,10 @@
       winSound.load();
       if (typeof Chess !== 'undefined') game = new Chess();
       else document.body.innerHTML += '<div class="error">Warning: Chess.js failed to load. Game may not function.</div>';
+      if (typeof Worker !== 'undefined') stockfish = new Worker('https://unpkg.com/stockfish@14.0.0/stockfish.js');
+      else console.log('Worker not supported, AI disabled');
       createBoard();
-      resetBoard();
-    });
-
-    // Promotion handler
-    game.on('move', (move) => {
-      if (move.flags.includes('p')) {
-        document.getElementById('promotion-menu').classList.add('active');
-        selectedSquare = move.to;
-      }
-      movesHistory.push(move.san);
+      resetGame();
     });
   </script>
 </body>
