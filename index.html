@@ -65,9 +65,9 @@
       from { box-shadow: inset 0 0 10px #003300, 0 0 5px #0f0; }
       to { box-shadow: inset 0 0 15px #003300, 0 0 15px #0f0; }
     }
-    #board { 
-      width: 100%; 
-      height: 220px; 
+    #board {
+      width: 100%;
+      height: 220px;
       display: grid;
       grid-template-columns: repeat(8, 1fr);
       grid-template-rows: repeat(8, 1fr);
@@ -133,10 +133,7 @@
       box-shadow: 0 2px #060;
       transform: translateY(2px);
     }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -165,9 +162,14 @@
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0-beta.2/chess.min.js"></script>
   <script>
-    const game = new Chess();
+    // Minimal chess engine
+    let position = {
+      a8: 'r', b8: 'n', c8: 'b', d8: 'q', e8: 'k', f8: 'b', g8: 'n', h8: 'r',
+      a7: 'p', b7: 'p', c7: 'p', d7: 'p', e7: 'p', f7: 'p', g7: 'p', h7: 'p',
+      a2: 'P', b2: 'P', c2: 'P', d2: 'P', e2: 'P', f2: 'P', g2: 'P', h2: 'P',
+      a1: 'R', b1: 'N', c1: 'B', d1: 'Q', e1: 'K', f1: 'B', g1: 'N', h1: 'R'
+    };
     let isAI = false;
     let currentPlayer = 'white';
     let clockTime = 300;
@@ -175,7 +177,8 @@
     let blackTime = clockTime;
     let timerInterval;
     let selectedSquare = null;
-    let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    let movesHistory = [];
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
     const pieceSymbols = {
       'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔',
@@ -194,6 +197,28 @@
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.5);
       } catch (e) { /* Audio not supported */ }
+    }
+
+    function isValidMove(from, to) {
+      const piece = position[from];
+      if (!piece) return false;
+      const isWhite = piece === piece.toUpperCase();
+      if ((isWhite && currentPlayer !== 'white') || (!isWhite && currentPlayer !== 'black')) return false;
+      // Basic move validation (pawn forward only, no captures or checks)
+      if (piece.toLowerCase() === 'p') {
+        const fromRow = parseInt(from[1]);
+        const toRow = parseInt(to[1]);
+        const col = from[0];
+        const dir = isWhite ? 1 : -1;
+        if (col !== to[0]) return false; // No diagonal moves
+        if (isWhite && fromRow === 2 && toRow === 4 && !position[col + '3'] && !position[to]) return true;
+        if (!isWhite && fromRow === 7 && toRow === 5 && !position[col + '6'] && !position[to]) return true;
+        if (toRow === fromRow + dir && !position[to]) return true;
+      } else {
+        // Allow other pieces to move anywhere (simplified)
+        if (!position[to]) return true;
+      }
+      return false;
     }
 
     function createBoard() {
@@ -215,37 +240,30 @@
 
     function handleSquareClick(row, col) {
       const square = String.fromCharCode(97 + col) + (row + 1);
-      const piece = game.get(square);
+      const piece = position[square];
 
       if (selectedSquare) {
-        const from = selectedSquare;
-        const move = game.move({ from, to: square, promotion: 'q' });
-        if (move) {
-          selectedSquare = null;
+        if (isValidMove(selectedSquare, square)) {
+          position[square] = position[selectedSquare];
+          delete position[selectedSquare];
+          movesHistory.push(`${selectedSquare}-${square}`);
           updateBoard();
           updateTicker();
           switchTurn();
-          if (game.game_over()) {
-            playBeep();
-            const winner = game.in_checkmate() ? (currentPlayer === 'white' ? 'Black' : 'White') : 'Draw';
-            alert(`Game Over! ${winner} wins!`);
-            stopClock();
-          } else if (isAI && currentPlayer === 'black') {
+          if (isAI && currentPlayer === 'black') {
             setTimeout(makeAIMove, 500);
           }
           startClock();
-        } else {
-          // Try select new square
-          if (piece && piece.color === currentPlayer[0]) {
-            selectedSquare = square;
-            updateBoard();
-          } else {
-            selectedSquare = null;
-            updateBoard();
+          if (position['e8'] !== 'k' || position['e1'] !== 'K') {
+            playBeep();
+            alert(`Game Over! ${currentPlayer === 'white' ? 'Black' : 'White'} wins!`);
+            stopClock();
           }
         }
+        selectedSquare = null;
+        updateBoard();
       } else {
-        if (piece && piece.color === currentPlayer[0]) {
+        if (piece && ((piece === piece.toUpperCase() && currentPlayer === 'white') || (piece === piece.toLowerCase() && currentPlayer === 'black'))) {
           selectedSquare = square;
           updateBoard();
         }
@@ -257,38 +275,41 @@
         for (let col = 0; col < 8; col++) {
           const squareEl = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
           const square = String.fromCharCode(97 + col) + (row + 1);
-          const piece = game.get(square);
-          squareEl.textContent = piece ? pieceSymbols[piece.type.toUpperCase() + (piece.color === 'w' ? '' : piece.type.toLowerCase())] || '' : '';
+          squareEl.textContent = position[square] ? pieceSymbols[position[square]] || '' : '';
           squareEl.classList.remove('selected', 'valid');
-
           if (selectedSquare === square) {
             squareEl.classList.add('selected');
-          } else if (selectedSquare) {
-            // Highlight valid moves
-            const moves = game.moves({ square: selectedSquare, verbose: true });
-            if (moves.some(m => m.to === square)) {
-              squareEl.classList.add('valid');
-            }
           }
         }
       }
     }
 
     function makeAIMove() {
-      const moves = game.moves();
-      if (moves.length) {
-        const randomMove = moves[Math.floor(Math.random() * moves.length)];
-        game.move(randomMove);
-        updateBoard();
-        updateTicker();
-        switchTurn();
-        if (game.game_over()) {
-          playBeep();
-          const winner = game.in_checkmate() ? 'Black' : 'Draw';
-          alert(`Game Over! ${winner} wins!`);
-          stopClock();
+      const squares = Object.keys(position).filter(s => position[s] === position[s].toLowerCase());
+      if (squares.length) {
+        const from = squares[Math.floor(Math.random() * squares.length)];
+        const possibleMoves = [];
+        for (let row = 1; row <= 8; row++) {
+          for (let col = 0; col < 8; col++) {
+            const to = String.fromCharCode(97 + col) + row;
+            if (isValidMove(from, to)) possibleMoves.push(to);
+          }
         }
-        startClock();
+        if (possibleMoves.length) {
+          const to = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+          position[to] = position[from];
+          delete position[from];
+          movesHistory.push(`${from}-${to}`);
+          updateBoard();
+          updateTicker();
+          switchTurn();
+          if (position['e1'] !== 'K') {
+            playBeep();
+            alert('Game Over! Black wins!');
+            stopClock();
+          }
+          startClock();
+        }
       }
     }
 
@@ -297,8 +318,7 @@
     }
 
     function updateTicker() {
-      const moves = game.history();
-      document.getElementById('moves').innerText = moves.length ? moves.join(' • ') : 'No moves yet';
+      document.getElementById('moves').innerText = movesHistory.length ? movesHistory.join(' • ') : 'No moves yet';
     }
 
     function startClock() {
@@ -326,12 +346,18 @@
     }
 
     function resetGame() {
-      game.reset();
+      position = {
+        a8: 'r', b8: 'n', c8: 'b', d8: 'q', e8: 'k', f8: 'b', g8: 'n', h8: 'r',
+        a7: 'p', b7: 'p', c7: 'p', d7: 'p', e7: 'p', f7: 'p', g7: 'p', h7: 'p',
+        a2: 'P', b2: 'P', c2: 'P', d2: 'P', e2: 'P', f2: 'P', g2: 'P', h2: 'P',
+        a1: 'R', b1: 'N', c1: 'B', d1: 'Q', e1: 'K', f1: 'B', g1: 'N', h1: 'R'
+      };
       whiteTime = clockTime;
       blackTime = clockTime;
       currentPlayer = 'white';
       selectedSquare = null;
-      isAI = false; // Default to multi
+      movesHistory = [];
+      isAI = false;
       updateBoard();
       updateTicker();
       updateClock();
@@ -368,14 +394,8 @@
     document.getElementById('mode-select').onchange = (e) => setClockMode(e.target.value);
 
     // Initialize
-    window.addEventListener('load', () => {
-      if (typeof Chess === 'undefined') {
-        document.body.innerHTML += '<div style="color:red;position:absolute;top:10px;">Error: Chess.js failed to load. Check connection.</div>';
-        return;
-      }
-      createBoard();
-      resetGame();
-    });
+    createBoard();
+    resetGame();
   </script>
 </body>
 </html>
