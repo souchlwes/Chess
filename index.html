@@ -79,15 +79,15 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 28px; /* Larger for visibility */
+      font-size: 30px; /* Larger for visibility */
       cursor: pointer;
       user-select: none;
-      text-shadow: 0 0 3px #000, 0 0 3px #000; /* Stronger outline */
+      text-shadow: 0 0 4px #000, 0 0 4px #000; /* Maximum contrast */
       color: #fff; /* White pieces */
     }
     .square.black-piece { color: #000; } /* Black pieces */
-    .square.light { background: #f5e8c7; } /* Brighter beige */
-    .square.dark { background: #7a5230; } /* Darker brown */
+    .square.light { background: #fff8e1; } /* Brightest beige */
+    .square.dark { background: #6b4e31; } /* Darkest brown */
     .square.selected { background: #ffeb3b !important; }
     .square.valid { background: #4caf50 !important; }
     .info {
@@ -137,6 +137,7 @@
       transform: translateY(2px);
     }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error { color: red; position: absolute; top: 10px; left: 10px; }
   </style>
 </head>
 <body>
@@ -173,7 +174,7 @@
   <audio id="win-sound" src="The loser has to fall.mp3"></audio>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0-beta.2/chess.min.js"></script>
   <script>
-    const game = new Chess();
+    let game;
     let isAI = false;
     let aiLevel = 'easy';
     let currentPlayer = 'white';
@@ -184,6 +185,8 @@
     let selectedSquare = null;
     const winSound = document.getElementById('win-sound');
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    let position = null; // Fallback board state
+    let movesHistory = [];
 
     const pieceSymbols = {
       'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔',
@@ -202,6 +205,40 @@
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.5);
       } catch (e) { console.log('Beep failed:', e); }
+    }
+
+    function isValidMove(from, to) {
+      if (game && typeof game.move === 'function') {
+        const move = game.move({ from, to, promotion: 'q', verbose: true });
+        if (move) {
+          game.undo();
+          return true;
+        }
+        return false;
+      }
+      // Fallback minimal engine
+      const piece = position[from];
+      if (!piece) return false;
+      const isWhite = piece === piece.toUpperCase();
+      if ((isWhite && currentPlayer !== 'white') || (!isWhite && currentPlayer !== 'black')) return false;
+      const fromRow = parseInt(from[1]);
+      const toRow = parseInt(to[1]);
+      const fromCol = from[0].charCodeAt(0) - 97;
+      const toCol = to[0].charCodeAt(0) - 97;
+      const colDiff = Math.abs(toCol - fromCol);
+      const rowDiff = toRow - fromRow;
+      const dir = isWhite ? 1 : -1;
+      const target = position[to];
+
+      if (piece.toLowerCase() === 'p') {
+        if (colDiff === 0 && !target && rowDiff === dir) return true;
+        if (colDiff === 0 && !target && ((isWhite && fromRow === 2 && toRow === 4 && !position[from[0] + '3']) || (!isWhite && fromRow === 7 && toRow === 5 && !position[from[0] + '6']))) return true;
+        if (colDiff === 1 && rowDiff === dir && target) return true;
+      } else if (piece.toLowerCase() === 'n') {
+        const knightMoves = [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]];
+        return knightMoves.some(([r, c]) => rowDiff === r && colDiff === Math.abs(c));
+      }
+      return !target || (isWhite && target === target.toLowerCase()) || (!isWhite && target === target.toUpperCase());
     }
 
     function createBoard() {
@@ -223,23 +260,42 @@
 
     function handleSquareClick(row, col) {
       const square = String.fromCharCode(97 + col) + (row + 1);
-      const piece = game.get(square);
+      const piece = game ? game.get(square) : position[square];
 
       if (selectedSquare) {
-        const move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
-        if (move) {
+        if (isValidMove(selectedSquare, square)) {
+          if (game) {
+            const move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
+            if (move) {
+              movesHistory.push(move.san);
+            }
+          } else {
+            position[square] = position[selectedSquare];
+            delete position[selectedSquare];
+            movesHistory.push(`${selectedSquare}-${square}`);
+          }
           selectedSquare = null;
           updateBoard();
           updateTicker();
           switchTurn();
-          if (game.game_over()) {
+          if (game && game.game_over()) {
             try {
               winSound.play().catch(e => {
                 console.log('MP3 play failed:', e);
-                playBeep(); // Fallback to beep
+                playBeep();
               });
               const winner = game.in_checkmate() ? (currentPlayer === 'white' ? 'Black' : 'White') : 'Draw';
               alert(`Game Over! ${winner}!`);
+              stopClock();
+            } catch (e) { console.log('Game over error:', e); }
+          } else if (!game && (!position['e8'] || !position['e1'])) {
+            try {
+              winSound.play().catch(e => {
+                console.log('MP3 play failed:', e);
+                playBeep();
+              });
+              const winner = !position['e8'] ? 'White' : 'Black';
+              alert(`Game Over! ${winner} wins!`);
               stopClock();
             } catch (e) { console.log('Game over error:', e); }
           } else if (isAI && currentPlayer === 'black') {
@@ -247,7 +303,8 @@
           }
           startClock();
         } else {
-          if (piece && piece.color === currentPlayer[0]) {
+          const newPiece = game ? game.get(square) : position[square];
+          if (newPiece && ((game && newPiece.color === currentPlayer[0]) || (!game && ((newPiece === newPiece.toUpperCase() && currentPlayer === 'white') || (newPiece === newPiece.toLowerCase() && currentPlayer === 'black'))))) {
             selectedSquare = square;
             updateBoard();
           } else {
@@ -256,7 +313,7 @@
           }
         }
       } else {
-        if (piece && piece.color === currentPlayer[0]) {
+        if (piece && ((game && piece.color === currentPlayer[0]) || (!game && ((piece === piece.toUpperCase() && currentPlayer === 'white') || (piece === piece.toLowerCase() && currentPlayer === 'black'))))) {
           selectedSquare = square;
           updateBoard();
         }
@@ -267,43 +324,79 @@
       const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
       let score = 0;
       if (move.captured) score += pieceValues[move.captured.toLowerCase()];
-      if (move.flags.includes('p')) score += 5;
-      if (move.san.includes('+')) score += 2;
+      if (move.flags && move.flags.includes('p')) score += 5;
+      if (move.san && move.san.includes('+')) score += 2;
       return score + Math.random() * 0.1;
     }
 
     function makeAIMove() {
       if (!isAI || currentPlayer !== 'black') return;
-      const moves = game.moves({ verbose: true });
-      if (moves.length) {
-        let move;
-        if (aiLevel === 'easy') {
-          move = moves[Math.floor(Math.random() * moves.length)];
-        } else if (aiLevel === 'medium') {
-          const scored = moves.map(m => ({ move: m, score: evaluateMove(m) }));
-          scored.sort((a, b) => b.score - a.score);
-          const topMoves = scored.slice(0, Math.ceil(scored.length / 2));
-          move = topMoves[Math.floor(Math.random() * topMoves.length)].move;
-        } else {
-          const scored = moves.map(m => ({ move: m, score: evaluateMove(m) }));
-          move = scored.reduce((best, curr) => curr.score > best.score ? curr : best, scored[0]).move;
+      if (game) {
+        const moves = game.moves({ verbose: true });
+        if (moves.length) {
+          let move;
+          if (aiLevel === 'easy') {
+            move = moves[Math.floor(Math.random() * moves.length)];
+          } else if (aiLevel === 'medium') {
+            const scored = moves.map(m => ({ move: m, score: evaluateMove(m) }));
+            scored.sort((a, b) => b.score - a.score);
+            const topMoves = scored.slice(0, Math.ceil(scored.length / 2));
+            move = topMoves[Math.floor(Math.random() * topMoves.length)].move;
+          } else {
+            const scored = moves.map(m => ({ move: m, score: evaluateMove(m) }));
+            move = scored.reduce((best, curr) => curr.score > best.score ? curr : best, scored[0]).move;
+          }
+          game.move({ from: move.from, to: move.to, promotion: 'q' });
+          movesHistory.push(move.san);
+          updateBoard();
+          updateTicker();
+          switchTurn();
+          if (game.game_over()) {
+            try {
+              winSound.play().catch(e => {
+                console.log('MP3 play failed:', e);
+                playBeep();
+              });
+              const winner = game.in_checkmate() ? 'Black' : 'Draw';
+              alert(`Game Over! ${winner}!`);
+              stopClock();
+            } catch (e) { console.log('Game over error:', e); }
+          } else {
+            startClock();
+          }
         }
-        game.move({ from: move.from, to: move.to, promotion: 'q' });
-        updateBoard();
-        updateTicker();
-        switchTurn();
-        if (game.game_over()) {
-          try {
-            winSound.play().catch(e => {
-              console.log('MP3 play failed:', e);
-              playBeep(); // Fallback to beep
-            });
-            const winner = game.in_checkmate() ? 'Black' : 'Draw';
-            alert(`Game Over! ${winner}!`);
-            stopClock();
-          } catch (e) { console.log('Game over error:', e); }
-        } else {
-          startClock();
+      } else {
+        const blackPieces = Object.keys(position).filter(s => position[s] && position[s] === position[s].toLowerCase());
+        if (blackPieces.length) {
+          const from = blackPieces[Math.floor(Math.random() * blackPieces.length)];
+          const possibleMoves = [];
+          for (let row = 1; row <= 8; row++) {
+            for (let col = 0; col < 8; col++) {
+              const to = String.fromCharCode(97 + col) + row;
+              if (isValidMove(from, to)) possibleMoves.push(to);
+            }
+          }
+          if (possibleMoves.length) {
+            const to = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+            position[to] = position[from];
+            delete position[from];
+            movesHistory.push(`${from}-${to}`);
+            updateBoard();
+            updateTicker();
+            switchTurn();
+            if (!position['e1']) {
+              try {
+                winSound.play().catch(e => {
+                  console.log('MP3 play failed:', e);
+                  playBeep();
+                });
+                alert('Game Over! Black wins!');
+                stopClock();
+              } catch (e) { console.log('Game over error:', e); }
+            } else {
+              startClock();
+            }
+          }
         }
       }
     }
@@ -317,15 +410,15 @@
         for (let col = 0; col < 8; col++) {
           const squareEl = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
           const square = String.fromCharCode(97 + col) + (row + 1);
-          const piece = game.get(square);
-          squareEl.textContent = piece ? pieceSymbols[piece.type.toUpperCase() + (piece.color === 'w' ? '' : piece.type.toLowerCase())] || '' : '';
+          const piece = game ? game.get(square) : position[square];
+          squareEl.textContent = piece ? (game ? pieceSymbols[piece.type.toUpperCase() + (piece.color === 'w' ? '' : piece.type.toLowerCase())] : pieceSymbols[piece]) || '' : '';
           squareEl.classList.remove('selected', 'valid', 'black-piece');
-          if (piece && piece.color === 'b') squareEl.classList.add('black-piece');
+          if (piece && ((game && piece.color === 'b') || (!game && piece === piece.toLowerCase()))) squareEl.classList.add('black-piece');
           if (selectedSquare === square) {
             squareEl.classList.add('selected');
           } else if (selectedSquare) {
-            const moves = game.moves({ square: selectedSquare, verbose: true });
-            if (moves.some(m => m.to === square)) {
+            const moves = game ? game.moves({ square: selectedSquare, verbose: true }) : [];
+            if (moves.some(m => m.to === square) || (!game && isValidMove(selectedSquare, square))) {
               squareEl.classList.add('valid');
             }
           }
@@ -334,8 +427,7 @@
     }
 
     function updateTicker() {
-      const moves = game.history();
-      document.getElementById('moves').innerText = moves.length ? moves.join(' • ') : 'No moves yet';
+      document.getElementById('moves').innerText = movesHistory.length ? movesHistory.join(' • ') : 'No moves yet';
     }
 
     function startClock() {
@@ -348,7 +440,7 @@
           try {
             winSound.play().catch(e => {
               console.log('MP3 play failed:', e);
-              playBeep(); // Fallback to beep
+              playBeep();
             });
             const winner = whiteTime <= 0 ? 'Black' : 'White';
             alert(`Time's up! ${winner} wins!`);
@@ -368,12 +460,21 @@
     }
 
     function resetGame() {
-      game.reset();
+      if (game) game.reset();
+      else {
+        position = {
+          a8: 'r', b8: 'n', c8: 'b', d8: 'q', e8: 'k', f8: 'b', g8: 'n', h8: 'r',
+          a7: 'p', b7: 'p', c7: 'p', d7: 'p', e7: 'p', f7: 'p', g7: 'p', h7: 'p',
+          a2: 'P', b2: 'P', c2: 'P', d2: 'P', e2: 'P', f2: 'P', g2: 'P', h2: 'P',
+          a1: 'R', b1: 'N', c1: 'B', d1: 'Q', e1: 'K', f1: 'B', g1: 'N', h1: 'R'
+        };
+      }
       whiteTime = clockTime;
       blackTime = clockTime;
       currentPlayer = 'white';
       selectedSquare = null;
       isAI = false;
+      movesHistory = [];
       updateBoard();
       updateTicker();
       updateClock();
@@ -415,13 +516,20 @@
 
     // Initialize
     window.addEventListener('load', () => {
+      winSound.load(); // Preload audio
       if (typeof Chess === 'undefined') {
-        document.body.innerHTML += '<div style="color:red;position:absolute;top:10px;">Error: Chess.js failed to load. Check connection.</div>';
-        return;
+        document.body.innerHTML += '<div class="error">Warning: Chess.js failed to load. Using fallback engine.</div>';
+        position = {
+          a8: 'r', b8: 'n', c8: 'b', d8: 'q', e8: 'k', f8: 'b', g8: 'n', h8: 'r',
+          a7: 'p', b7: 'p', c7: 'p', d7: 'p', e7: 'p', f7: 'p', g7: 'p', h7: 'p',
+          a2: 'P', b2: 'P', c2: 'P', d2: 'P', e2: 'P', f2: 'P', g2: 'P', h2: 'P',
+          a1: 'R', b1: 'N', c1: 'B', d1: 'Q', e1: 'K', f1: 'B', g1: 'N', h1: 'R'
+        };
+      } else {
+        game = new Chess();
       }
       createBoard();
       resetGame();
-      winSound.load(); // Preload audio
     });
   </script>
 </body>
