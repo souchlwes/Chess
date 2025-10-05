@@ -4,21 +4,58 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Brick Chess</title>
-  <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chessboardjs@1.0.0/dist/chessboard.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/chessboardjs@1.0.0/dist/chessboard.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chess.js@1.0.0/chess.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/stockfish/stockfish.js"></script>
+  <style>
+    body {
+      background: radial-gradient(circle at center, #111 0%, #000 100%);
+      font-family: 'Press Start 2P', monospace;
+      color: #0f0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .console { perspective: 1000px; }
+    .shell {
+      width: 320px;
+      height: 600px;
+      background: linear-gradient(to bottom, #2a5fb8, #1c3f7a);
+      border-radius: 20px;
+      box-shadow: 0 0 20px #0f0, inset 0 0 10px #000;
+      padding: 20px;
+      transform: rotateX(4deg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      position: relative;
+    }
+    .logo {
+      position: absolute;
+      bottom: 10px;
+      font-size: 12px;
+      color: #000;
+      text-shadow: 1px 1px #0f0;
+    }
+    .bolts {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      display: flex;
+      gap: 200px;
+      font-size: 20px;
+      color: #fff;
+      text-shadow: 0 0 5px #0ff;
+    }
+  </style>
 </head>
 <body>
   <div class="console">
     <div class="shell">
       <div class="logo">CUBE GAME</div>
-      <div class="bolts">
-        <div class="bolt">⚡</div>
-        <div class="bolt">⚡</div>
-      </div>
+      <div class="bolts"><div class="bolt">⚡</div><div class="bolt">⚡</div></div>
       <div class="screen">
         <div id="board"></div>
         <div class="info">
@@ -41,7 +78,136 @@
   </div>
 
   <audio id="win-sound" src="https://www.dropbox.com/scl/fi/o1pzso0aav78g26pqe0br/The-loser-has-to-fall.mp3?rlkey=fxczjyqevgcy2h4qqyw7d2050&raw=1"></audio>
+  <script src="https://cdn.jsdelivr.net/npm/chessboardjs@1.0.0/dist/chessboard.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chess.js@1.0.0/chess.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/stockfish/stockfish.js"></script>
+  <script>
+    const game = new Chess();
+    let board;
+    let stockfish = new Worker("https://cdn.jsdelivr.net/npm/stockfish/stockfish.js");
+    let isAI = false;
+    let currentPlayer = "white";
+    let clockTime = 300;
+    let whiteTime = clockTime;
+    let blackTime = clockTime;
+    let timerInterval;
+    const winSound = document.getElementById("win-sound");
 
-  <script src="script.js"></script>
+    function initBoard() {
+      board = Chessboard("board", {
+        position: "start",
+        draggable: true,
+        onDrop: handleMove
+      });
+      updateTicker();
+      startClock();
+    }
+
+    function handleMove(source, target) {
+      const move = game.move({ from: source, to: target, promotion: "q" });
+      if (!move) return "snapback";
+      updateTicker();
+      switchTurn();
+      if (game.game_over()) {
+        winSound.play();
+        alert("Game Over!");
+        stopClock();
+      }
+      if (isAI && currentPlayer === "black") {
+        setTimeout(makeAIMove, 500);
+      }
+    }
+
+    function makeAIMove() {
+      stockfish.postMessage("position fen " + game.fen());
+      stockfish.postMessage("go depth 15");
+      stockfish.onmessage = function (event) {
+        if (event.data.includes("bestmove")) {
+          const move = event.data.split(" ")[1];
+          game.move({ from: move.slice(0, 2), to: move.slice(2, 4), promotion: "q" });
+          board.position(game.fen());
+          updateTicker();
+          switchTurn();
+          if (game.game_over()) {
+            winSound.play();
+            alert("Game Over!");
+            stopClock();
+          }
+        }
+      };
+    }
+
+    function switchTurn() {
+      currentPlayer = currentPlayer === "white" ? "black" : "white";
+    }
+
+    function updateTicker() {
+      const moves = game.history();
+      document.getElementById("moves").innerText = moves.join(" • ");
+    }
+
+    function startClock() {
+      stopClock();
+      timerInterval = setInterval(() => {
+        if (currentPlayer === "white") whiteTime--;
+        else blackTime--;
+        updateClock();
+        if (whiteTime <= 0 || blackTime <= 0) {
+          winSound.play();
+          alert("Time's up!");
+          stopClock();
+        }
+      }, 1000);
+    }
+
+    function stopClock() {
+      clearInterval(timerInterval);
+    }
+
+    function updateClock() {
+      const format = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+      document.getElementById("clock").innerText = `W ${format(whiteTime)} | B ${format(blackTime)}`;
+    }
+    document.getElementById("ai-toggle").onclick = () => {
+      isAI = true;
+      resetGame();
+    };
+
+    document.getElementById("multi-toggle").onclick = () => {
+      isAI = false;
+      resetGame();
+    };
+
+    document.getElementById("start").onclick = () => {
+      resetGame();
+    };
+
+    document.getElementById("reset").onclick = () => {
+      resetGame();
+    };
+
+    document.getElementById("mode-select").onchange = (e) => {
+      setClockMode(e.target.value);
+    };
+
+    function resetGame() {
+      game.reset();
+      board.position("start");
+      whiteTime = clockTime;
+      blackTime = clockTime;
+      currentPlayer = "white";
+      updateTicker();
+      startClock();
+    }
+
+    function setClockMode(mode) {
+      if (mode === "blitz") clockTime = 300;
+      if (mode === "rapid") clockTime = 900;
+      if (mode === "classical") clockTime = 1800;
+      resetGame();
+    }
+
+    window.onload = initBoard;
+  </script>
 </body>
 </html>
