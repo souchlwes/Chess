@@ -1,6 +1,6 @@
 const game = new Chess();
 let board;
-let stockfish = new Worker("https://cdn.jsdelivr.net/npm/stockfish/stockfish.js");
+let stockfish = new Worker("https://cdn.jsdelivr.net/npm/stockfish@14.0.0/stockfish.min.js");
 let isAI = false;
 let currentPlayer = "white";
 let clockTime = 300;
@@ -10,13 +10,18 @@ let timerInterval;
 const winSound = document.getElementById("win-sound");
 
 function initBoard() {
-  board = Chessboard("board", {
-    position: "start",
-    draggable: true,
-    onDrop: handleMove
-  });
-  updateTicker();
-  startClock();
+  try {
+    board = Chessboard("board", {
+      position: "start",
+      draggable: true,
+      onDrop: handleMove
+    });
+    updateTicker();
+    startClock();
+  } catch (error) {
+    console.error("Failed to initialize chessboard:", error);
+    alert("Error loading chessboard. Please check your internet connection or try again later.");
+  }
 }
 
 function handleMove(source, target) {
@@ -25,9 +30,13 @@ function handleMove(source, target) {
   updateTicker();
   switchTurn();
   if (game.game_over()) {
-    winSound.play();
-    alert("Game Over!");
-    stopClock();
+    try {
+      winSound.play().catch((error) => console.error("Audio playback failed:", error));
+      alert("Game Over!");
+      stopClock();
+    } catch (error) {
+      console.error("Error during game over:", error);
+    }
   }
   if (isAI && currentPlayer === "black") {
     setTimeout(makeAIMove, 500);
@@ -35,22 +44,38 @@ function handleMove(source, target) {
 }
 
 function makeAIMove() {
-  stockfish.postMessage("position fen " + game.fen());
-  stockfish.postMessage("go depth 15");
-  stockfish.onmessage = function (event) {
-    if (event.data.includes("bestmove")) {
-      const move = event.data.split(" ")[1];
-      game.move({ from: move.slice(0, 2), to: move.slice(2, 4), promotion: "q" });
-      board.position(game.fen());
-      updateTicker();
-      switchTurn();
-      if (game.game_over()) {
-        winSound.play();
-        alert("Game Over!");
-        stopClock();
+  try {
+    stockfish.postMessage("position fen " + game.fen());
+    stockfish.postMessage("go depth 15");
+    stockfish.onmessage = function (event) {
+      if (event.data.includes("bestmove")) {
+        const move = event.data.split(" ")[1];
+        try {
+          const result = game.move({ from: move.slice(0, 2), to: move.slice(2, 4), promotion: "q" });
+          if (result) {
+            board.position(game.fen());
+            updateTicker();
+            switchTurn();
+            if (game.game_over()) {
+              try {
+                winSound.play().catch((error) => console.error("Audio playback failed:", error));
+                alert("Game Over!");
+                stopClock();
+              } catch (error) {
+                console.error("Error during AI game over:", error);
+              }
+            }
+          } else {
+            console.error("Invalid AI move:", move);
+          }
+        } catch (error) {
+          console.error("Error processing AI move:", error);
+        }
       }
-    }
-  };
+    };
+  } catch (error) {
+    console.error("Stockfish error:", error);
+  }
 }
 
 function switchTurn() {
@@ -69,9 +94,13 @@ function startClock() {
     else blackTime--;
     updateClock();
     if (whiteTime <= 0 || blackTime <= 0) {
-      winSound.play();
-      alert("Time's up!");
-      stopClock();
+      try {
+        winSound.play().catch((error) => console.error("Audio playback failed:", error));
+        alert("Time's up!");
+        stopClock();
+      } catch (error) {
+        console.error("Error during time out:", error);
+      }
     }
   }, 1000);
 }
