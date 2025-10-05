@@ -4,9 +4,140 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Brick Chess</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      background: radial-gradient(circle at center, #111 0%, #000 100%);
+      font-family: 'Press Start 2P', monospace;
+      color: #0f0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .console { perspective: 1000px; }
+    .shell {
+      width: 360px;
+      height: 620px;
+      background: linear-gradient(to bottom, #2a5fb8, #1c3f7a);
+      border-radius: 20px;
+      box-shadow: 0 0 20px #0f0, inset 0 0 10px #000;
+      padding: 20px;
+      transform: rotateX(4deg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      position: relative;
+    }
+    .logo {
+      position: absolute;
+      bottom: 10px;
+      font-size: 12px;
+      color: #000;
+      text-shadow: 1px 1px #0f0;
+    }
+    .bolts {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      display: flex;
+      gap: 240px;
+      font-size: 20px;
+      color: #fff;
+      text-shadow: 0 0 5px #0ff;
+    }
+    .screen {
+      width: 280px;
+      height: 280px;
+      background: linear-gradient(to bottom, #0f0, #060);
+      border: 4px inset #003300;
+      box-shadow: inset 0 0 10px #003300, 0 0 10px #0f0;
+      padding: 5px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-radius: 8px;
+      animation: glow 2s infinite alternate;
+    }
+    @keyframes glow {
+      from { box-shadow: inset 0 0 10px #003300, 0 0 5px #0f0; }
+      to { box-shadow: inset 0 0 15px #003300, 0 0 15px #0f0; }
+    }
+    #board { 
+      width: 100%; 
+      height: 220px; 
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      gap: 1px;
+      background: #333;
+      border: 2px solid #000;
+    }
+    .square {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .square.light { background: #f0d9b5; }
+    .square.dark { background: #b58863; }
+    .square.selected { background: #ffeb3b !important; }
+    .square.valid { background: #4caf50 !important; }
+    .info {
+      font-size: 10px;
+      color: #000;
+      background: #0f0;
+      padding: 4px;
+      border-top: 2px solid #003300;
+      font-family: 'Press Start 2P', monospace;
+    }
+    #clock { margin-bottom: 5px; }
+    #moves {
+      max-height: 40px;
+      overflow-x: auto;
+      white-space: nowrap;
+      font-size: 8px;
+      background: #000;
+      color: #0f0;
+      padding: 2px;
+      border: 1px solid #0f0;
+      scrollbar-width: thin;
+      scrollbar-color: #0f0 #000;
+    }
+    #moves::-webkit-scrollbar { height: 6px; }
+    #moves::-webkit-scrollbar-thumb { background: #0f0; }
+    #moves::-webkit-scrollbar-track { background: #000; }
+    .controls {
+      width: 280px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    button, select {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      background: linear-gradient(to bottom, #444, #111);
+      color: #0f0;
+      border: 2px solid #0f0;
+      padding: 6px;
+      box-shadow: 0 4px #0a0;
+      text-shadow: 0 1px #000;
+      transition: all 0.2s ease;
+      border-radius: 6px;
+    }
+    button:active, select:active {
+      box-shadow: 0 2px #060;
+      transform: translateY(2px);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
 </head>
 <body>
   <div class="console">
@@ -17,7 +148,7 @@
         <div id="board"></div>
         <div class="info">
           <div id="clock">⏱ 05:00</div>
-          <div id="moves"></div>
+          <div id="moves">No moves yet</div>
         </div>
       </div>
       <div class="controls">
@@ -34,11 +165,217 @@
     </div>
   </div>
 
-  <audio id="win-sound" src="The loser has to fall.mp3"></audio>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0-beta.2/chess.min.js"></script>
-  <script src="stockfish.js"></script>
-  <script src="script.js"></script>
+  <script>
+    const game = new Chess();
+    let isAI = false;
+    let currentPlayer = 'white';
+    let clockTime = 300;
+    let whiteTime = clockTime;
+    let blackTime = clockTime;
+    let timerInterval;
+    let selectedSquare = null;
+    let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+    const pieceSymbols = {
+      'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔',
+      'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚'
+    };
+
+    function playBeep() {
+      try {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = 800;
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+      } catch (e) { /* Audio not supported */ }
+    }
+
+    function createBoard() {
+      const boardEl = document.getElementById('board');
+      boardEl.innerHTML = '';
+      for (let row = 7; row >= 0; row--) {
+        for (let col = 0; col < 8; col++) {
+          const square = document.createElement('div');
+          square.classList.add('square');
+          square.classList.add((row + col) % 2 === 0 ? 'light' : 'dark');
+          square.dataset.row = row;
+          square.dataset.col = col;
+          square.addEventListener('click', () => handleSquareClick(row, col));
+          boardEl.appendChild(square);
+        }
+      }
+      updateBoard();
+    }
+
+    function handleSquareClick(row, col) {
+      const square = String.fromCharCode(97 + col) + (row + 1);
+      const piece = game.get(square);
+
+      if (selectedSquare) {
+        const from = selectedSquare;
+        const move = game.move({ from, to: square, promotion: 'q' });
+        if (move) {
+          selectedSquare = null;
+          updateBoard();
+          updateTicker();
+          switchTurn();
+          if (game.game_over()) {
+            playBeep();
+            const winner = game.in_checkmate() ? (currentPlayer === 'white' ? 'Black' : 'White') : 'Draw';
+            alert(`Game Over! ${winner} wins!`);
+            stopClock();
+          } else if (isAI && currentPlayer === 'black') {
+            setTimeout(makeAIMove, 500);
+          }
+          startClock();
+        } else {
+          // Try select new square
+          if (piece && piece.color === currentPlayer[0]) {
+            selectedSquare = square;
+            updateBoard();
+          } else {
+            selectedSquare = null;
+            updateBoard();
+          }
+        }
+      } else {
+        if (piece && piece.color === currentPlayer[0]) {
+          selectedSquare = square;
+          updateBoard();
+        }
+      }
+    }
+
+    function updateBoard() {
+      for (let row = 7; row >= 0; row--) {
+        for (let col = 0; col < 8; col++) {
+          const squareEl = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+          const square = String.fromCharCode(97 + col) + (row + 1);
+          const piece = game.get(square);
+          squareEl.textContent = piece ? pieceSymbols[piece.type.toUpperCase() + (piece.color === 'w' ? '' : piece.type.toLowerCase())] || '' : '';
+          squareEl.classList.remove('selected', 'valid');
+
+          if (selectedSquare === square) {
+            squareEl.classList.add('selected');
+          } else if (selectedSquare) {
+            // Highlight valid moves
+            const moves = game.moves({ square: selectedSquare, verbose: true });
+            if (moves.some(m => m.to === square)) {
+              squareEl.classList.add('valid');
+            }
+          }
+        }
+      }
+    }
+
+    function makeAIMove() {
+      const moves = game.moves();
+      if (moves.length) {
+        const randomMove = moves[Math.floor(Math.random() * moves.length)];
+        game.move(randomMove);
+        updateBoard();
+        updateTicker();
+        switchTurn();
+        if (game.game_over()) {
+          playBeep();
+          const winner = game.in_checkmate() ? 'Black' : 'Draw';
+          alert(`Game Over! ${winner} wins!`);
+          stopClock();
+        }
+        startClock();
+      }
+    }
+
+    function switchTurn() {
+      currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
+    }
+
+    function updateTicker() {
+      const moves = game.history();
+      document.getElementById('moves').innerText = moves.length ? moves.join(' • ') : 'No moves yet';
+    }
+
+    function startClock() {
+      stopClock();
+      timerInterval = setInterval(() => {
+        if (currentPlayer === 'white') whiteTime--;
+        else blackTime--;
+        updateClock();
+        if (whiteTime <= 0 || blackTime <= 0) {
+          playBeep();
+          const winner = whiteTime <= 0 ? 'Black' : 'White';
+          alert(`Time's up! ${winner} wins!`);
+          stopClock();
+        }
+      }, 1000);
+    }
+
+    function stopClock() {
+      clearInterval(timerInterval);
+    }
+
+    function updateClock() {
+      const format = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+      document.getElementById('clock').innerText = `W ${format(whiteTime)} | B ${format(blackTime)}`;
+    }
+
+    function resetGame() {
+      game.reset();
+      whiteTime = clockTime;
+      blackTime = clockTime;
+      currentPlayer = 'white';
+      selectedSquare = null;
+      isAI = false; // Default to multi
+      updateBoard();
+      updateTicker();
+      updateClock();
+      stopClock();
+      document.getElementById('ai-toggle').disabled = false;
+      document.getElementById('multi-toggle').disabled = false;
+    }
+
+    function setClockMode(mode) {
+      if (mode === 'blitz') clockTime = 300;
+      else if (mode === 'rapid') clockTime = 900;
+      else if (mode === 'classical') clockTime = 1800;
+      resetGame();
+    }
+
+    // Button event listeners
+    document.getElementById('start').onclick = () => {
+      resetGame();
+      startClock();
+    };
+    document.getElementById('reset').onclick = resetGame;
+    document.getElementById('ai-toggle').onclick = () => {
+      isAI = true;
+      resetGame();
+      document.getElementById('multi-toggle').disabled = true;
+      document.getElementById('ai-toggle').disabled = true;
+    };
+    document.getElementById('multi-toggle').onclick = () => {
+      isAI = false;
+      resetGame();
+      document.getElementById('ai-toggle').disabled = true;
+      document.getElementById('multi-toggle').disabled = true;
+    };
+    document.getElementById('mode-select').onchange = (e) => setClockMode(e.target.value);
+
+    // Initialize
+    window.addEventListener('load', () => {
+      if (typeof Chess === 'undefined') {
+        document.body.innerHTML += '<div style="color:red;position:absolute;top:10px;">Error: Chess.js failed to load. Check connection.</div>';
+        return;
+      }
+      createBoard();
+      resetGame();
+    });
+  </script>
 </body>
 </html>
