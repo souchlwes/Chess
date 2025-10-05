@@ -299,7 +299,6 @@
       const target = position[to];
       const tempPosition = { ...position };
 
-      // Simulate move for validation
       tempPosition[to] = tempPosition[from];
       delete tempPosition[from];
       if (isInCheck(isWhite ? 'w' : 'b', tempPosition)) return false;
@@ -355,14 +354,11 @@
       return true;
     }
 
-    function isInCheck(color) {
-      const kingPos = Object.entries(position).find(([_, p]) => p.toLowerCase() === 'k' && (color === 'w' ? p === 'K' : p === 'k'))[0];
-      return Object.entries(position).some(([pos, piece]) => {
-        if ((color === 'w' ? piece === piece.toUpperCase() : piece === piece.toLowerCase()) || !isValidMove(pos, kingPos)) return false;
-        const temp = { ...position };
-        temp[kingPos] = temp[pos];
-        delete temp[pos];
-        return !isInCheckAfterMove(pos, kingPos, color === 'w' ? 'b' : 'w', temp);
+    function isInCheck(color, pos = position) {
+      const kingPos = Object.entries(pos).find(([_, p]) => p.toLowerCase() === 'k' && (color === 'w' ? p === 'K' : p === 'k'))[0];
+      return Object.entries(pos).some(([pos, piece]) => {
+        if ((color === 'w' ? piece === piece.toUpperCase() : piece === piece.toLowerCase()) || !isValidMove(pos, kingPos, pos)) return false;
+        return true;
       });
     }
 
@@ -370,11 +366,7 @@
       const temp = { ...pos };
       temp[to] = temp[from];
       delete temp[from];
-      const kingPos = Object.entries(temp).find(([_, p]) => p.toLowerCase() === 'k' && (color === 'w' ? p === 'K' : p === 'k'))[0];
-      return Object.entries(temp).some(([pos, piece]) => {
-        if ((color === 'w' ? piece === piece.toUpperCase() : piece === piece.toLowerCase()) || !isValidMove(pos, kingPos, temp)) return false;
-        return true;
-      });
+      return isInCheck(color === 'w' ? 'b' : 'w', temp);
     }
 
     function handleSquareClick(row, col) {
@@ -382,6 +374,7 @@
       if (selectedSquare) {
         if (isValidMove(selectedSquare, square)) {
           movePiece(selectedSquare, square);
+          movesHistory.push(`${position[square].toUpperCase()}${square}`);
           selectedSquare = null;
           updateBoard();
           updateTicker();
@@ -416,6 +409,10 @@
         castlingAvailable[isWhite ? 'w' : 'b'][isKingSide ? 'k' : 'q'] = false;
       }
 
+      if (piece.toLowerCase() === 'p' && colDiff === 1 && rowDiff === (isWhite ? -2 : 2) && !position[to]) {
+        delete position[to[0] + (isWhite ? '4' : '5')];
+      }
+
       if (piece.toLowerCase() === 'p' && (toRow === 0 || toRow === 7)) {
         document.getElementById('promotion-menu').classList.add('active');
         selectedSquare = to;
@@ -425,7 +422,9 @@
       position[to] = position[from];
       delete position[from];
       if (piece.toLowerCase() === 'k') castlingAvailable[isWhite ? 'w' : 'b'] = { k: false, q: false };
-      if (piece.toLowerCase() === 'r' && (from === (isWhite ? 'a1' : 'a8') || from === (isWhite ? 'h1' : 'h8'))) castlingAvailable[isWhite ? 'w' : 'b'][from === (isWhite ? 'h1' : 'h8') ? 'k' : 'q'] = false;
+      if (piece.toLowerCase() === 'r' && ((isWhite && (from === 'a1' || from === 'h1')) || (!isWhite && (from === 'a8' || from === 'h8')))) {
+        castlingAvailable[isWhite ? 'w' : 'b'][from[0] === 'h' ? 'k' : 'q'] = false;
+      }
       lastMove = { from, to };
       moveCount++;
       moveHistory.push({ fen: getFEN(), turn: currentPlayer });
