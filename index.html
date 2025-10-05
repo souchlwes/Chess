@@ -79,12 +79,13 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
+      font-size: 24px;
       cursor: pointer;
       user-select: none;
+      text-shadow: 0 0 2px #000, 0 0 2px #000;
     }
-    .square.light { background: #f0d9b5; }
-    .square.dark { background: #b58863; }
+    .square.light { background: #e6d5a8; }
+    .square.dark { background: #8b5a2b; }
     .square.selected { background: #ffeb3b !important; }
     .square.valid { background: #4caf50 !important; }
     .info {
@@ -158,68 +159,33 @@
           <option value="rapid">RAPID</option>
           <option value="classical">CLASSICAL</option>
         </select>
+        <select id="ai-level">
+          <option value="easy">AI: Easy</option>
+          <option value="medium">AI: Medium</option>
+          <option value="hard">AI: Hard</option>
+        </select>
       </div>
     </div>
   </div>
 
+  <audio id="win-sound" src="The loser has to fall.mp3"></audio>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0-beta.2/chess.min.js"></script>
   <script>
-    // Minimal chess engine
-    let position = {
-      a8: 'r', b8: 'n', c8: 'b', d8: 'q', e8: 'k', f8: 'b', g8: 'n', h8: 'r',
-      a7: 'p', b7: 'p', c7: 'p', d7: 'p', e7: 'p', f7: 'p', g7: 'p', h7: 'p',
-      a2: 'P', b2: 'P', c2: 'P', d2: 'P', e2: 'P', f2: 'P', g2: 'P', h2: 'P',
-      a1: 'R', b1: 'N', c1: 'B', d1: 'Q', e1: 'K', f1: 'B', g1: 'N', h1: 'R'
-    };
+    const game = new Chess();
     let isAI = false;
+    let aiLevel = 'easy';
     let currentPlayer = 'white';
     let clockTime = 300;
     let whiteTime = clockTime;
     let blackTime = clockTime;
     let timerInterval;
     let selectedSquare = null;
-    let movesHistory = [];
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const winSound = document.getElementById('win-sound');
 
     const pieceSymbols = {
       'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔',
       'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚'
     };
-
-    function playBeep() {
-      try {
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        oscillator.frequency.value = 800;
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.5);
-      } catch (e) { /* Audio not supported */ }
-    }
-
-    function isValidMove(from, to) {
-      const piece = position[from];
-      if (!piece) return false;
-      const isWhite = piece === piece.toUpperCase();
-      if ((isWhite && currentPlayer !== 'white') || (!isWhite && currentPlayer !== 'black')) return false;
-      // Basic move validation (pawn forward only, no captures or checks)
-      if (piece.toLowerCase() === 'p') {
-        const fromRow = parseInt(from[1]);
-        const toRow = parseInt(to[1]);
-        const col = from[0];
-        const dir = isWhite ? 1 : -1;
-        if (col !== to[0]) return false; // No diagonal moves
-        if (isWhite && fromRow === 2 && toRow === 4 && !position[col + '3'] && !position[to]) return true;
-        if (!isWhite && fromRow === 7 && toRow === 5 && !position[col + '6'] && !position[to]) return true;
-        if (toRow === fromRow + dir && !position[to]) return true;
-      } else {
-        // Allow other pieces to move anywhere (simplified)
-        if (!position[to]) return true;
-      }
-      return false;
-    }
 
     function createBoard() {
       const boardEl = document.getElementById('board');
@@ -240,74 +206,80 @@
 
     function handleSquareClick(row, col) {
       const square = String.fromCharCode(97 + col) + (row + 1);
-      const piece = position[square];
+      const piece = game.get(square);
 
       if (selectedSquare) {
-        if (isValidMove(selectedSquare, square)) {
-          position[square] = position[selectedSquare];
-          delete position[selectedSquare];
-          movesHistory.push(`${selectedSquare}-${square}`);
+        const move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
+        if (move) {
+          selectedSquare = null;
           updateBoard();
           updateTicker();
           switchTurn();
-          if (isAI && currentPlayer === 'black') {
+          if (game.game_over()) {
+            try {
+              winSound.play().catch(e => console.log('Audio play failed:', e));
+              const winner = game.in_checkmate() ? (currentPlayer === 'white' ? 'Black' : 'White') : 'Draw';
+              alert(`Game Over! ${winner}!`);
+              stopClock();
+            } catch (e) { console.log('Game over error:', e); }
+          } else if (isAI && currentPlayer === 'black') {
             setTimeout(makeAIMove, 500);
           }
           startClock();
-          if (position['e8'] !== 'k' || position['e1'] !== 'K') {
-            playBeep();
-            alert(`Game Over! ${currentPlayer === 'white' ? 'Black' : 'White'} wins!`);
-            stopClock();
+        } else {
+          if (piece && piece.color === currentPlayer[0]) {
+            selectedSquare = square;
+            updateBoard();
+          } else {
+            selectedSquare = null;
+            updateBoard();
           }
         }
-        selectedSquare = null;
-        updateBoard();
       } else {
-        if (piece && ((piece === piece.toUpperCase() && currentPlayer === 'white') || (piece === piece.toLowerCase() && currentPlayer === 'black'))) {
+        if (piece && piece.color === currentPlayer[0]) {
           selectedSquare = square;
           updateBoard();
         }
       }
     }
 
-    function updateBoard() {
-      for (let row = 7; row >= 0; row--) {
-        for (let col = 0; col < 8; col++) {
-          const squareEl = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-          const square = String.fromCharCode(97 + col) + (row + 1);
-          squareEl.textContent = position[square] ? pieceSymbols[position[square]] || '' : '';
-          squareEl.classList.remove('selected', 'valid');
-          if (selectedSquare === square) {
-            squareEl.classList.add('selected');
-          }
-        }
-      }
+    function evaluateMove(move) {
+      const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+      let score = 0;
+      if (move.captured) score += pieceValues[move.captured.toLowerCase()];
+      if (move.flags.includes('p')) score += 5;
+      if (move.san.includes('+')) score += 2;
+      return score + Math.random() * 0.1;
     }
 
     function makeAIMove() {
-      const squares = Object.keys(position).filter(s => position[s] === position[s].toLowerCase());
-      if (squares.length) {
-        const from = squares[Math.floor(Math.random() * squares.length)];
-        const possibleMoves = [];
-        for (let row = 1; row <= 8; row++) {
-          for (let col = 0; col < 8; col++) {
-            const to = String.fromCharCode(97 + col) + row;
-            if (isValidMove(from, to)) possibleMoves.push(to);
-          }
+      if (!isAI || currentPlayer !== 'black') return;
+      const moves = game.moves({ verbose: true });
+      if (moves.length) {
+        let move;
+        if (aiLevel === 'easy') {
+          move = moves[Math.floor(Math.random() * moves.length)];
+        } else if (aiLevel === 'medium') {
+          const scored = moves.map(m => ({ move: m, score: evaluateMove(m) }));
+          scored.sort((a, b) => b.score - a.score);
+          const topMoves = scored.slice(0, Math.ceil(scored.length / 2));
+          move = topMoves[Math.floor(Math.random() * topMoves.length)].move;
+        } else {
+          const scored = moves.map(m => ({ move: m, score: evaluateMove(m) }));
+          move = scored.reduce((best, curr) => curr.score > best.score ? curr : best, scored[0]).move;
         }
-        if (possibleMoves.length) {
-          const to = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-          position[to] = position[from];
-          delete position[from];
-          movesHistory.push(`${from}-${to}`);
-          updateBoard();
-          updateTicker();
-          switchTurn();
-          if (position['e1'] !== 'K') {
-            playBeep();
-            alert('Game Over! Black wins!');
+        game.move({ from: move.from, to: move.to, promotion: 'q' });
+        updateBoard();
+        updateTicker();
+        switchTurn();
+        if (game.game_over()) {
+          try {
+            winSound.play().catch(e => console.log('Audio play failed:', e));
+            const winner = game.in_checkmate() ? 'Black' : 'Draw';
+            alert(`Game Over! ${winner}!`);
             stopClock();
-          }
+          } catch (e) { console.log('Game over error:', e); }
+        } else {
           startClock();
         }
       }
@@ -317,8 +289,29 @@
       currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
     }
 
+    function updateBoard() {
+      for (let row = 7; row >= 0; row--) {
+        for (let col = 0; col < 8; col++) {
+          const squareEl = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+          const square = String.fromCharCode(97 + col) + (row + 1);
+          const piece = game.get(square);
+          squareEl.textContent = piece ? pieceSymbols[piece.type.toUpperCase() + (piece.color === 'w' ? '' : piece.type.toLowerCase())] || '' : '';
+          squareEl.classList.remove('selected', 'valid');
+          if (selectedSquare === square) {
+            squareEl.classList.add('selected');
+          } else if (selectedSquare) {
+            const moves = game.moves({ square: selectedSquare, verbose: true });
+            if (moves.some(m => m.to === square)) {
+              squareEl.classList.add('valid');
+            }
+          }
+        }
+      }
+    }
+
     function updateTicker() {
-      document.getElementById('moves').innerText = movesHistory.length ? movesHistory.join(' • ') : 'No moves yet';
+      const moves = game.history();
+      document.getElementById('moves').innerText = moves.length ? moves.join(' • ') : 'No moves yet';
     }
 
     function startClock() {
@@ -328,10 +321,12 @@
         else blackTime--;
         updateClock();
         if (whiteTime <= 0 || blackTime <= 0) {
-          playBeep();
-          const winner = whiteTime <= 0 ? 'Black' : 'White';
-          alert(`Time's up! ${winner} wins!`);
-          stopClock();
+          try {
+            winSound.play().catch(e => console.log('Audio play failed:', e));
+            const winner = whiteTime <= 0 ? 'Black' : 'White';
+            alert(`Time's up! ${winner} wins!`);
+            stopClock();
+          } catch (e) { console.log('Timeout error:', e); }
         }
       }, 1000);
     }
@@ -346,17 +341,11 @@
     }
 
     function resetGame() {
-      position = {
-        a8: 'r', b8: 'n', c8: 'b', d8: 'q', e8: 'k', f8: 'b', g8: 'n', h8: 'r',
-        a7: 'p', b7: 'p', c7: 'p', d7: 'p', e7: 'p', f7: 'p', g7: 'p', h7: 'p',
-        a2: 'P', b2: 'P', c2: 'P', d2: 'P', e2: 'P', f2: 'P', g2: 'P', h2: 'P',
-        a1: 'R', b1: 'N', c1: 'B', d1: 'Q', e1: 'K', f1: 'B', g1: 'N', h1: 'R'
-      };
+      game.reset();
       whiteTime = clockTime;
       blackTime = clockTime;
       currentPlayer = 'white';
       selectedSquare = null;
-      movesHistory = [];
       isAI = false;
       updateBoard();
       updateTicker();
@@ -392,10 +381,22 @@
       document.getElementById('multi-toggle').disabled = true;
     };
     document.getElementById('mode-select').onchange = (e) => setClockMode(e.target.value);
+    document.getElementById('ai-level').onchange = (e) => {
+      aiLevel = e.target.value;
+      resetGame();
+    };
 
     // Initialize
-    createBoard();
-    resetGame();
+    window.addEventListener('load', () => {
+      if (typeof Chess === 'undefined') {
+        document.body.innerHTML += '<div style="color:red;position:absolute;top:10px;">Error: Chess.js failed to load. Check connection.</div>';
+        return;
+      }
+      createBoard();
+      resetGame();
+      // Preload audio to avoid delays
+      winSound.load();
+    });
   </script>
 </body>
 </html>
