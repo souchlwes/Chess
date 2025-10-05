@@ -3,15 +3,13 @@ let board;
 let stockfish = new Worker("https://cdn.jsdelivr.net/npm/stockfish/stockfish.js");
 let isAI = false;
 let currentPlayer = "white";
-let clockTime = 300; // default to blitz
+let clockTime = 300;
 let whiteTime = clockTime;
 let blackTime = clockTime;
 let timerInterval;
 
-// 🎵 Victory sound
 const winSound = document.getElementById("win-sound");
 
-// 🕹️ Initialize board
 function initBoard() {
   board = Chessboard("board", {
     position: "start",
@@ -22,7 +20,6 @@ function initBoard() {
   startClock();
 }
 
-// ♟️ Handle player move
 function handleMove(source, target) {
   const move = game.move({ from: source, to: target, promotion: "q" });
   if (!move) return "snapback";
@@ -41,7 +38,6 @@ function handleMove(source, target) {
   }
 }
 
-// 🤖 AI Move
 function makeAIMove() {
   stockfish.postMessage("position fen " + game.fen());
   stockfish.postMessage("go depth 15");
@@ -61,19 +57,16 @@ function makeAIMove() {
   };
 }
 
-// 🔁 Switch turn
 function switchTurn() {
   currentPlayer = currentPlayer === "white" ? "black" : "white";
 }
 
-// 📜 Update move ticker
 function updateTicker() {
   const moves = game.history();
   const ticker = document.getElementById("moves");
   ticker.innerText = moves.join(" • ");
 }
 
-// ⏱️ Clock logic
 function startClock() {
   stopClock();
   timerInterval = setInterval(() => {
@@ -101,7 +94,6 @@ function updateClock() {
   clock.innerText = `W ${format(whiteTime)} | B ${format(blackTime)}`;
 }
 
-// 🎮 Mode toggles
 document.getElementById("ai-toggle").onclick = () => {
   isAI = true;
   resetGame();
@@ -124,7 +116,6 @@ document.getElementById("mode-select").onchange = (e) => {
   setClockMode(e.target.value);
 };
 
-// 🔄 Reset game
 function resetGame() {
   game.reset();
   board.position("start");
@@ -135,7 +126,6 @@ function resetGame() {
   startClock();
 }
 
-// 🕰️ Clock presets
 function setClockMode(mode) {
   if (mode === "blitz") clockTime = 300;
   if (mode === "rapid") clockTime = 900;
