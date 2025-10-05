@@ -20,8 +20,8 @@
     }
     .console { perspective: 1000px; }
     .shell {
-      width: 480px; /* Wider to accommodate larger screen */
-      height: 740px; /* Taller to fit board and controls */
+      width: 440px; /* Slightly wider for balance */
+      height: 700px; /* Adjusted for screen and controls */
       background: linear-gradient(to bottom, #2a5fb8, #1c3f7a);
       border-radius: 20px;
       box-shadow: 0 0 20px #0f0, inset 0 0 10px #000;
@@ -30,8 +30,9 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 20px;
+      gap: 15px;
       position: relative;
+      border: 2px solid #0f0; /* Added detail */
     }
     .logo {
       position: absolute;
@@ -45,14 +46,14 @@
       top: 10px;
       left: 10px;
       display: flex;
-      gap: 360px; /* Adjusted for wider shell */
+      gap: 320px; /* Adjusted for shell width */
       font-size: 20px;
       color: #fff;
       text-shadow: 0 0 5px #0ff;
     }
     .screen {
-      width: 400px; /* Increased to fit 8x8 board comfortably */
-      height: 400px; /* Matches width for square overlay */
+      width: 400px; /* Optimized for 360px board */
+      height: 400px;
       background: linear-gradient(to bottom, #0f0, #060);
       border: 4px inset #003300;
       box-shadow: inset 0 0 10px #003300, 0 0 10px #0f0;
@@ -69,7 +70,7 @@
     }
     #board {
       width: 360px; /* 45px x 8 squares */
-      height: 360px; /* 45px x 8 squares */
+      height: 360px;
       display: grid;
       grid-template-columns: repeat(8, 1fr);
       grid-template-rows: repeat(8, 1fr);
@@ -81,10 +82,10 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 28px; /* Adjusted for visibility */
+      font-size: 28px;
       cursor: pointer;
       user-select: none;
-      text-shadow: 0 0 10px #000, 0 0 10px #000; /* Enhanced contrast */
+      text-shadow: 0 0 12px #000, 0 0 12px #000; /* Improved contrast */
       color: #ffffff;
     }
     .square.black-piece { color: #000000; }
@@ -117,7 +118,7 @@
     #moves::-webkit-scrollbar-thumb { background: #0f0; }
     #moves::-webkit-scrollbar-track { background: #000; }
     .controls {
-      width: 400px; /* Matches screen width */
+      width: 400px;
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 10px;
@@ -163,7 +164,7 @@
       padding: 8px 16px;
       font-size: 12px;
     }
-    .error { color: red; position: absolute; top: 10px; left: 10px; }
+    .error { color: red; position: absolute; top: 10px; left: 10px; font-size: 12px; }
     .promotion-menu {
       display: none;
       position: absolute;
@@ -226,7 +227,7 @@
   <script>
     let game;
     let isAI = false;
-    let aiLevel = 'easy';
+    let aiLevel = 'easy'; // Simplified to one level for stability
     let currentPlayer = 'white';
     let clockTime = 300;
     let whiteTime = clockTime;
@@ -275,7 +276,7 @@
 
     function handleSquareClick(row, col) {
       const square = String.fromCharCode(97 + col) + (8 - row);
-      if (!game) return; // Fallback disabled for now
+      if (!game) return;
 
       if (selectedSquare) {
         const move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
@@ -296,33 +297,13 @@
       }
     }
 
-    function evaluateMove(move) {
-      const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
-      let score = 0;
-      if (move.captured) score += pieceValues[move.captured.toLowerCase()];
-      if (move.flags.includes('c')) score += 5;
-      if (move.san.includes('+')) score += 2;
-      return score + Math.random() * 0.1;
-    }
-
     function makeAIMove() {
       if (!isAI || currentPlayer !== 'black' || !game) return;
-      const moves = game.moves({ verbose: true });
+      const moves = game.moves();
       if (moves.length) {
-        let move;
-        if (aiLevel === 'easy') {
-          move = moves[Math.floor(Math.random() * moves.length)];
-        } else if (aiLevel === 'medium') {
-          const scored = moves.map(m => ({ move: m, score: evaluateMove(m) }));
-          scored.sort((a, b) => b.score - a.score);
-          const topMoves = scored.slice(0, Math.ceil(scored.length / 2));
-          move = topMoves[Math.floor(Math.random() * topMoves.length)].move;
-        } else {
-          const scored = moves.map(m => ({ move: m, score: evaluateMove(m) }));
-          move = scored.reduce((best, curr) => curr.score > best.score ? curr : best, scored[0]).move;
-        }
+        const move = moves[Math.floor(Math.random() * moves.length)];
         game.move(move);
-        movesHistory.push(move.san);
+        movesHistory.push(move);
         updateBoard();
         updateTicker();
         switchTurn();
@@ -476,17 +457,18 @@
     window.addEventListener('load', () => {
       winSound.load();
       if (typeof Chess !== 'undefined') game = new Chess();
-      else document.body.innerHTML += '<div class="error">Warning: Chess.js failed to load. Game may not function fully.</div>';
+      else document.body.innerHTML += '<div class="error">Warning: Chess.js failed to load. Game may not function.</div>';
       createBoard();
-      resetGame();
+      resetBoard();
     });
 
-    // Promotion handler (triggered by chess.js)
+    // Promotion handler
     game.on('move', (move) => {
       if (move.flags.includes('p')) {
         document.getElementById('promotion-menu').classList.add('active');
         selectedSquare = move.to;
       }
+      movesHistory.push(move.san);
     });
   </script>
 </body>
